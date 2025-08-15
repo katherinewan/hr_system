@@ -1,0 +1,111 @@
+/* ===== CSS CUSTOM PROPERTIES ===== */
+:root {
+  /* === COLORS === */
+  /* Primary Corporate Colors (from your mood board) */
+  --color-primary: #254e70;
+  --color-secondary: #799496;
+  --color-accent: #7a8b99;
+  
+  /* Text Colors */
+  --color-text: #2e382e;
+  --color-text-light: #6b7280;
+  --color-text-lighter: #9ca3af;
+  
+  /* Background Colors */
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f8faf9;
+  --color-bg-tertiary: #f5f7fa;
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+  
+  /* Status Backgrounds */
+  --color-success-bg: #ecfdf5;
+  --color-warning-bg: #fef3c7;
+  --color-danger-bg: #fef2f2;
+  --color-info-bg: #dbeafe;
+  
+  /* Borders */
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  
+  /* === SPACING === */
+  --space-xs: 0.25rem;    /* 4px */
+  --space-sm: 0.5rem;     /* 8px */
+  --space-md: 0.75rem;    /* 12px */
+  --space-lg: 1rem;       /* 16px */
+  --space-xl: 1.5rem;     /* 24px */
+  --space-2xl: 2rem;      /* 32px */
+  --space-3xl: 3rem;      /* 48px */
+  
+  /* === FONT SIZES === */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
+  --text-4xl: 2.25rem;    /* 36px */
+  
+  /* === FONT WEIGHTS === */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* === BORDER RADIUS === */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 50%;
+  
+  /* === SHADOWS === */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  
+  /* === TRANSITIONS === */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  /* === Z-INDEX === */
+  --z-dropdown: 1000;
+  --z-modal: 1050;
+  --z-tooltip: 1070;
+  
+  /* === COMPONENT SIZES === */
+  --header-height: 120px;
+  --button-height: 44px;
+  --input-height: 44px;
+  
+  /* === CONTAINER WIDTHS === */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1400px;
+}
+
+/* === COMPONENT VARIANTS === */
+/* Use these classes to apply color schemes */
+.variant-blue {
+  --accent-color: var(--color-primary);
+  --accent-bg: #e5f0f5;
+}
+
+.variant-teal {
+  --accent-color: var(--color-secondary);
+  --accent-bg: #f0f5f4;
+}
+
+.variant-grey {
+  --accent-color: var(--color-accent);
+  --accent-bg: #f2f4f6;
+}
