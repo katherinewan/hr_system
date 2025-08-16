@@ -32,7 +32,7 @@ import {
   History
 } from 'lucide-react';
 // logo
-import logo from '../assets/logo.png';
+import logo from '../assets/Logo.png';
 
 export default function ButtonAppBar() {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
