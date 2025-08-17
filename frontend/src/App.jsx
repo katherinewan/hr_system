@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import Login from './pages/Loginform';
-import Homepage from './pages/HR_Homepage';
+import Login from './pages/HR/Loginform';
+import Homepage from './pages/HR/HR_Homepage';
+import StaffHomepage from './pages/staff/StaffHomepage';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

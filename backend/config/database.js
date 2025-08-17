@@ -77,7 +77,7 @@ const validateEnvironment = () => {
     console.error('Please set the following environment variables in Railway:');
     console.error('- DB_HOST: aws-1-ap-northeast-1.pooler.supabase.com');
     console.error('- DB_USER: postgres.mgvpyjqfllmipmlxcrub');
-    console.error('- DB_PASSWORD: [your_supabase_password]');
+    console.error('- DB_PASSWORD: Kath@1998');
     process.exit(1);
   }
 };
