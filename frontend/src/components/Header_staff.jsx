@@ -126,10 +126,10 @@ export default function ButtonAppBar() {
 
   const menuItems = [
     { text: 'Dashboard', icon: <Home />, path: '/'},
-    { text: 'Staff Profile', icon: <Users />, path: '/staffs'},
+    { text: 'Staff Profile', icon: <Users />, path: '/staff-profile'}, // 改這裡
     { text: 'Attendance', icon: <Calendar />, path: '/attendance'}, 
-    { text: 'Leave Management', icon: <FileHeart />, path: '/leave-management'}, 
-    { text: 'Payslip', icon: <CircleDollarSign />, path: '/salary'},
+    { text: 'Leave Management', icon: <FileHeart />, path: '/leave'}, // 也要改這個
+    { text: 'Payslip', icon: <CircleDollarSign />, path: '/payslip'}, // 還有這個
     { text: 'Settings', icon: <Settings />, path: '/settings', category: 'system' },
     { text: 'Sign Out', icon: <LogOut />, path: '/logout', category: 'auth', isLogout: true }
   ];

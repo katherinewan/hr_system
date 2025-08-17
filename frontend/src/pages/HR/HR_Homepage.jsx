@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
@@ -195,32 +195,31 @@ export default function Homepage() {
   console.log('✅ HR Homepage component loaded');
   
   return (
-    <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<DashboardHome />} />
-          <Route path="/staffs" element={<Staffinfo />} />
-          <Route path="/staffinfo" element={<Staffinfo />} />
-          <Route path="/user-accounts" element={<UserAccount />} />
-          <Route path="/attendance" element={<Attendance />} />
-          <Route path="/salary" element={<Salary />} />
-          <Route path="/payroll" element={
-            <div className="coming-soon">
-              <h2>Payroll Management</h2>
-              <p>Coming soon...</p>
-            </div>
-          } />
-          <Route path="/position" element={<Position />} />
-          <Route path="/department" element={<Department />} />
-          <Route path="/settings" element={
-            <div className="coming-soon">
-              <h2>System Settings</h2>
-              <p>Coming soon...</p>
-            </div>
-          } />
-          <Route path="*" element={<DashboardHome />} />
-        </Routes>
-      </Layout>
-    </Router>
+    // 移除 <Router> 標籤
+    <Layout>
+      <Routes>
+        <Route path="/" element={<DashboardHome />} />
+        <Route path="/staffs" element={<Staffinfo />} />
+        <Route path="/staffinfo" element={<Staffinfo />} />
+        <Route path="/user-accounts" element={<UserAccount />} />
+        <Route path="/attendance" element={<Attendance />} />
+        <Route path="/salary" element={<Salary />} />
+        <Route path="/payroll" element={
+          <div className="coming-soon">
+            <h2>Payroll Management</h2>
+            <p>Coming soon...</p>
+          </div>
+        } />
+        <Route path="/position" element={<Position />} />
+        <Route path="/department" element={<Department />} />
+        <Route path="/settings" element={
+          <div className="coming-soon">
+            <h2>System Settings</h2>
+            <p>Coming soon...</p>
+          </div>
+        } />
+        <Route path="*" element={<DashboardHome />} />
+      </Routes>
+    </Layout>
   );
 }

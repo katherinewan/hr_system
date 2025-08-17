@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
@@ -128,20 +128,19 @@ export default function Homepage() {
   console.log('✅ HR Homepage component loaded');
   
   return (
-    <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<StaffDashboard />} />
-          <Route path="/dashboard" element={<StaffDashboard />} />
-          <Route path="/home" element={<DashboardHome />} />
-          <Route path="/staff-profile" element={<StaffProfile />} />
-          <Route path="/attendance" element={<Attendance />} />
-          <Route path="/leave" element={<Leave />} />
-          <Route path="/payslip" element={<Payslip />} />
-          <Route path="/settings" element={<ComingSoon title="System Settings" />} />
-          <Route path="*" element={<StaffDashboard />} />
-        </Routes>
-      </Layout>
-    </Router>
+    // 移除 <Router> 標籤
+    <Layout>
+      <Routes>
+        <Route path="/" element={<StaffDashboard />} />
+        <Route path="/dashboard" element={<StaffDashboard />} />
+        <Route path="/home" element={<DashboardHome />} />
+        <Route path="/staff-profile" element={<StaffProfile />} />
+        <Route path="/attendance" element={<Attendance />} />
+        <Route path="/leave" element={<Leave />} />
+        <Route path="/payslip" element={<Payslip />} />
+        <Route path="/settings" element={<ComingSoon title="System Settings" />} />
+        <Route path="*" element={<StaffDashboard />} />
+      </Routes>
+    </Layout>
   );
 }
