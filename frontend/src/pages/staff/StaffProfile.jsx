@@ -20,7 +20,8 @@ const StaffProfile = () => {
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
       return 'http://localhost:3001';
     }
-    return process.env._APP_API_URL || 'http://localhost:3001';
+    // 修正：從 process.env._APP_API_URL 改為 import.meta.env.VITE_API_URL
+    return import.meta.env.VITE_API_URL || 'http://localhost:3001';
   };
 
   const fetchProfileData = async () => {
@@ -100,7 +101,8 @@ const StaffProfile = () => {
     setUpdateLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${geREACTtApiUrl()}/api/staff/profile`, {
+      // 修正：從 geREACTtApiUrl() 改為 getApiUrl()
+      const response = await fetch(`${getApiUrl()}/api/staff/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

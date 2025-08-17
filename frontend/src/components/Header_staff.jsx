@@ -21,14 +21,7 @@ import {
   CircleDollarSign, 
   Settings, 
   LogOut, 
-  Building2, 
-  Landmark, 
-  Smile, 
-  ContactRound,
   Home,
-  Bell,
-  User,
-  Clock,
   History
 } from 'lucide-react';
 // logo
@@ -189,16 +182,6 @@ export default function ButtonAppBar() {
       <Box sx={{ flex: 1, overflow: 'auto', py: 1 }}>
         {Object.entries(groupedItems).map(([category, items]) => (
           <Box key={category} sx={{ mb: 2 }}>
-            <Typography variant="overline" sx={{ 
-              px: 3, 
-              py: 1, 
-              display: 'block',
-              fontSize: '0.65rem',
-              fontWeight: 600,
-              opacity: 0.7,
-              letterSpacing: '1px'
-            }}>
-            </Typography>
             <List sx={{ py: 0 }}>
               {items.map((item) => (
                 <ListItem key={item.text} disablePadding>

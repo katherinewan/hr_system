@@ -10,15 +10,16 @@ const { pool, testConnection } = require('./config/database');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// CORS 配置 - 支援前端開發
 app.use(cors({
   origin: [
     'http://localhost:3000',  // React 開發伺服器
     'http://localhost:3001',  // 備用端口
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
-    // 生產環境的前端域名
-    // 'https://yourapp.com'
+    // 🆕 添加你的 Vercel 前端網址
+    'https://你的vercel網址.vercel.app',
+    // 或者如果你有自定義域名
+    'https://hr-system-tau.vercel.app' // 這裡放你實際的 Vercel 網址
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

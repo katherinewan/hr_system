@@ -60,15 +60,17 @@ const LoginPage = () => {
         throw new Error('Please enter staff ID and password');
       }
 
-      // Get API URL
+      // Get API URL - 修正：使用 Vite 環境變數
       const getApiUrl = () => {
         if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
           return 'http://localhost:3001';
         }
-        return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        // 修正：從 process.env.NEXT_PUBLIC_API_URL 改為 import.meta.env.VITE_API_URL
+        return import.meta.env.VITE_API_URL || 'http://localhost:3001';
       };
 
       console.log('Using real backend login');
+      console.log('API URL:', getApiUrl()); // 新增：用於調試
       
       // Real backend API call with better error handling
       const controller = new AbortController();
