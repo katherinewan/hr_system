@@ -16,13 +16,15 @@ const StaffProfile = () => {
     fetchWorkSummary();
   }, []);
 
+  // API
   const getApiUrl = () => {
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
       return 'http://localhost:3001';
     }
-    // 修正：從 process.env._APP_API_URL 改為 import.meta.env.VITE_API_URL
     return import.meta.env.VITE_API_URL || 'http://localhost:3001';
   };
+
+  const API_BASE_URL = `${getApiUrl()}/api`;
 
   const fetchProfileData = async () => {
     try {

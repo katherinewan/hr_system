@@ -18,6 +18,7 @@ import Attendance from './All_Attendance';
 import Position from './Position'; 
 import Department from './Department';
 import Salary from './Salary';
+import LeaveManagement from './LeaveManagement.jsx';
 
 // Layout Component
 const Layout = ({ children }) => (
@@ -204,6 +205,7 @@ export default function Homepage() {
         <Route path="/user-accounts" element={<UserAccount />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/salary" element={<Salary />} />
+        <Route path="/leave-management" element={<LeaveManagement />} />
         <Route path="/payroll" element={
           <div className="coming-soon">
             <h2>Payroll Management</h2>
