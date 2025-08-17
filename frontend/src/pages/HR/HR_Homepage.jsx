@@ -1,3 +1,4 @@
+// HR_Homepage.jsx - 完整版本
 import { Routes, Route } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { 
@@ -64,62 +65,115 @@ const DashboardHome = () => {
       title: 'Employee Management', 
       desc: 'View and manage employee information and records', 
       icon: Users,
-      path: '/staffs',
+      path: '/hr/staffs',
       color: 'blue'
     },
     { 
       title: 'User Accounts', 
       desc: 'Manage system user accounts and permissions', 
       icon: UserCheck,
-      path: '/user-accounts',
+      path: '/hr/user-accounts',
       color: 'green'
     },
     { 
       title: 'Attendance Tracking', 
       desc: 'Monitor employee attendance and working hours', 
       icon: Clock,
-      path: '/attendance',
+      path: '/hr/attendance',
       color: 'orange'
+    },
+    { 
+      title: 'Leave Management', 
+      desc: 'Manage employee leave requests and approvals', 
+      icon: Clock,
+      path: '/hr/leave-management',
+      color: 'red'
     },
     { 
       title: 'Position Management', 
       desc: 'Configure job positions and requirements', 
       icon: Briefcase,
-      path: '/position',
+      path: '/hr/position',
       color: 'purple'
     },
     { 
       title: 'Department Structure', 
       desc: 'Organize and manage company departments', 
       icon: Building2,
-      path: '/department',
+      path: '/hr/department',
       color: 'indigo'
     },
     { 
       title: 'Payroll & Salary', 
       desc: 'Handle salary calculations and payments', 
       icon: DollarSign,
-      path: '/salary',
+      path: '/hr/salary',
       color: 'emerald'
     }
   ];
 
+  const handleMenuClick = (path) => {
+    window.location.href = path;
+  };
+
   return (
     <div className="dashboard-container">
       {/* Hero Section */}
-      <div className="hero-section">
+      <div className="hero-section" style={{
+        background: 'linear-gradient(135deg, #254e70 0%, #799496 100%)',
+        color: 'white',
+        padding: '3rem 2rem',
+        borderRadius: '12px',
+        margin: '2rem',
+        marginTop: '1rem'
+      }}>
         <div className="hero-content">
           <div className="hero-text">
-            <h1 className="hero-title">HR Management System</h1>
-            <p className="hero-subtitle">
+            <h1 style={{ 
+              fontSize: '2.5rem', 
+              fontWeight: '700',
+              margin: '0 0 1rem 0'
+            }}>
+              HR Management System
+            </h1>
+            <p style={{ 
+              fontSize: '1.2rem',
+              margin: '0 0 1rem 0',
+              opacity: 0.9
+            }}>
               {userInfo ? `Welcome back, ${userInfo.name}!` : 'Welcome to HR Management System'}
             </p>
             {userInfo && (
-              <div className="user-details">
-                <span className="user-role">{userInfo.role}</span>
-                <span className="user-id">ID: {userInfo.staff_id}</span>
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                flexWrap: 'wrap'
+              }}>
+                <span style={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '20px',
+                  fontSize: '0.9rem'
+                }}>
+                  {userInfo.role}
+                </span>
+                <span style={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '20px',
+                  fontSize: '0.9rem'
+                }}>
+                  ID: {userInfo.staff_id}
+                </span>
                 {userInfo.department_name && (
-                  <span className="user-dept">{userInfo.department_name}</span>
+                  <span style={{
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.9rem'
+                  }}>
+                    {userInfo.department_name}
+                  </span>
                 )}
               </div>
             )}
@@ -128,39 +182,143 @@ const DashboardHome = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="stats-grid">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '1rem',
+        padding: '0 2rem',
+        marginBottom: '2rem'
+      }}>
         {quickStats.map((stat, index) => (
-          <div key={index} className={`stat-card stat-${stat.color}`}>
-            <div className="stat-icon">
+          <div key={index} style={{
+            backgroundColor: 'white',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}>
+            <div style={{
+              backgroundColor: `var(--${stat.color}-50, #f0f9ff)`,
+              color: `var(--${stat.color}-600, #2563eb)`,
+              padding: '0.75rem',
+              borderRadius: '8px'
+            }}>
               <stat.icon size={24} />
             </div>
-            <div className="stat-content">
-              <div className="stat-value">{stat.value}</div>
-              <div className="stat-label">{stat.label}</div>
+            <div>
+              <div style={{ 
+                fontSize: '2rem', 
+                fontWeight: '700',
+                color: '#1f2937',
+                lineHeight: 1
+              }}>
+                {stat.value}
+              </div>
+              <div style={{ 
+                color: '#6b7280',
+                fontSize: '0.9rem'
+              }}>
+                {stat.label}
+              </div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Quick Actions */}
-      <div className="section-card">
-        <div className="section-header">
-          <h2 className="section-title">Quick Actions</h2>
-          <Bell className="notification-icon" />
+      <div style={{
+        backgroundColor: 'white',
+        margin: '0 2rem',
+        borderRadius: '12px',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          padding: '2rem 2rem 1rem 2rem',
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: '1.5rem',
+            fontWeight: '600',
+            color: '#1f2937'
+          }}>
+            Quick Actions
+          </h2>
+          <Bell size={20} style={{ color: '#6b7280' }} />
         </div>
         
-        <div className="menu-grid">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '1rem',
+          padding: '2rem'
+        }}>
           {menuItems.map((item, index) => (
-            <div key={index} className={`menu-card menu-${item.color}`}>
-              <div className="menu-icon">
+            <div 
+              key={index} 
+              onClick={() => handleMenuClick(item.path)}
+              style={{
+                backgroundColor: '#f9fafb',
+                padding: '1.5rem',
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '1rem'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.borderColor = '#254e70';
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 8px 15px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.borderColor = '#e5e7eb';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{
+                backgroundColor: `var(--${item.color}-50, #f0f9ff)`,
+                color: `var(--${item.color}-600, #2563eb)`,
+                padding: '0.75rem',
+                borderRadius: '8px',
+                flexShrink: 0
+              }}>
                 <item.icon size={28} />
               </div>
-              <div className="menu-content">
-                <h3 className="menu-title">{item.title}</h3>
-                <p className="menu-desc">{item.desc}</p>
-                <div className="menu-arrow">
-                  <ArrowRight size={16} />
-                </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ 
+                  margin: '0 0 0.5rem 0',
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  color: '#1f2937'
+                }}>
+                  {item.title}
+                </h3>
+                <p style={{ 
+                  margin: 0,
+                  color: '#6b7280',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.4
+                }}>
+                  {item.desc}
+                </p>
+              </div>
+              <div style={{
+                color: '#6b7280',
+                alignSelf: 'center'
+              }}>
+                <ArrowRight size={16} />
               </div>
             </div>
           ))}
@@ -168,23 +326,67 @@ const DashboardHome = () => {
       </div>
 
       {/* System Info */}
-      <div className="system-info">
-        <div className="system-info-item">
-          <span className="info-label">System Version:</span>
-          <span className="info-value">v2.0.1</span>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '1rem',
+        padding: '2rem',
+        paddingBottom: '3rem'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '1rem',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>System Version:</span>
+          <span style={{ fontWeight: '600', color: '#1f2937' }}>v2.0.1</span>
         </div>
-        <div className="system-info-item">
-          <span className="info-label">Last Login:</span>
-          <span className="info-value">
+        <div style={{
+          backgroundColor: 'white',
+          padding: '1rem',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Last Login:</span>
+          <span style={{ fontWeight: '600', color: '#1f2937', fontSize: '0.85rem' }}>
             {userInfo?.last_login 
               ? new Date(userInfo.last_login).toLocaleString() 
               : 'First time login'
             }
           </span>
         </div>
-        <div className="system-info-item">
-          <span className="info-label">Server Status:</span>
-          <span className="info-value status-online">Online</span>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '1rem',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Server Status:</span>
+          <span style={{ 
+            fontWeight: '600', 
+            color: '#10b981',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              backgroundColor: '#10b981',
+              borderRadius: '50%'
+            }}></div>
+            Online
+          </span>
         </div>
       </div>
     </div>
@@ -196,7 +398,6 @@ export default function Homepage() {
   console.log('✅ HR Homepage component loaded');
   
   return (
-    // 移除 <Router> 標籤
     <Layout>
       <Routes>
         <Route path="/" element={<DashboardHome />} />
@@ -205,19 +406,33 @@ export default function Homepage() {
         <Route path="/user-accounts" element={<UserAccount />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/salary" element={<Salary />} />
-        <Route path="/leave-management" element={<LeaveManagement />} />
+        <Route path="/leave-management/*" element={<LeaveManagement />} />
         <Route path="/payroll" element={
-          <div className="coming-soon">
-            <h2>Payroll Management</h2>
-            <p>Coming soon...</p>
+          <div style={{
+            padding: '3rem',
+            textAlign: 'center',
+            backgroundColor: 'white',
+            margin: '2rem',
+            borderRadius: '12px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h2 style={{ color: '#254e70', marginBottom: '1rem' }}>Payroll Management</h2>
+            <p style={{ color: '#6b7280' }}>Coming soon...</p>
           </div>
         } />
         <Route path="/position" element={<Position />} />
         <Route path="/department" element={<Department />} />
         <Route path="/settings" element={
-          <div className="coming-soon">
-            <h2>System Settings</h2>
-            <p>Coming soon...</p>
+          <div style={{
+            padding: '3rem',
+            textAlign: 'center',
+            backgroundColor: 'white',
+            margin: '2rem',
+            borderRadius: '12px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h2 style={{ color: '#254e70', marginBottom: '1rem' }}>System Settings</h2>
+            <p style={{ color: '#6b7280' }}>Coming soon...</p>
           </div>
         } />
         <Route path="*" element={<DashboardHome />} />
