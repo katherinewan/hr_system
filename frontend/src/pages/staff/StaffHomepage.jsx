@@ -7,11 +7,11 @@ import {
   TrendingUp
 } from 'lucide-react';
 import Header from '../../components/Header_staff.jsx';
-import StaffDashboard from './StaffDashboard';
-import StaffProfile from './StaffProfile';
-import Attendance from './StaffAttendance'; 
-import Leave from './StaffLeave'; 
-import Payslip from './StaffPayslip';
+import StaffDashboard from './StaffDashboard.jsx';
+import StaffProfile from './StaffProfile.jsx';
+import Attendance from './StaffAttendance.jsx'; 
+import Leave from './StaffLeave.jsx'; 
+import Payslip from './StaffPayslip.jsx';
 
 // Layout Component
 const Layout = ({ children }) => (

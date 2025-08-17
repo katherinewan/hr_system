@@ -9,7 +9,6 @@ import {
   DollarSign,
   ArrowRight,
   Bell,
-  Calendar,
   TrendingUp
 } from 'lucide-react';
 import Header from '../../components/Header.jsx';

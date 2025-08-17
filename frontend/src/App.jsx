@@ -12,13 +12,11 @@ export default function App() {
   useEffect(() => {
     checkAuthentication();
     
-    // Listen for login success events
     const handleLoginSuccess = () => {
       console.log('Received login success event');
       checkAuthentication();
     };
 
-    // Listen for logout events
     const handleLogout = () => {
       console.log('Received logout event');
       setIsAuthenticated(false);
@@ -49,7 +47,6 @@ export default function App() {
           const user = JSON.parse(userInfo);
           console.log('Parsed user info:', user);
           
-          // Check if user role is valid (Admin, HR, or Employee)
           if (user.role === 'Admin' || user.role === 'HR' || user.role === 'Employee') {
             console.log('Authentication successful, role:', user.role);
             setIsAuthenticated(true);
@@ -57,13 +54,11 @@ export default function App() {
             return;
           } else {
             console.log('Invalid role:', user.role);
-            // Clear invalid authentication data
             localStorage.removeItem('authToken');
             localStorage.removeItem('userInfo');
           }
         } catch (parseError) {
           console.error('Failed to parse user info:', parseError);
-          // Clear corrupted data
           localStorage.removeItem('authToken');
           localStorage.removeItem('userInfo');
         }
@@ -120,50 +115,49 @@ export default function App() {
     );
   }
 
-  // If not authenticated, show login
-  if (!isAuthenticated) {
-    console.log('Rendering Login component');
-    return (
-      <Router>
-        <Login />
-      </Router>
-    );
-  }
-
-  // If authenticated, render based on role with routing
-  console.log('Rendering authenticated app for role:', userRole);
+  // 只使用一個 Router，根據認證狀態渲染不同的路由
   return (
     <Router>
       <Routes>
-        {/* HR and Admin routes */}
-        {(userRole === 'HR' || userRole === 'Admin') && (
-          <Route path="/hr/*" element={<Homepage />} />
+        {/* 未認證時的路由 */}
+        {!isAuthenticated && (
+          <Route path="*" element={<Login />} />
         )}
         
-        {/* Employee routes */}
-        {userRole === 'Employee' && (
-          <Route path="/staff/*" element={<StaffHomepage />} />
+        {/* 已認證時的路由 */}
+        {isAuthenticated && (
+          <>
+            {/* HR 和 Admin 路由 */}
+            {(userRole === 'HR' || userRole === 'Admin') && (
+              <Route path="/hr/*" element={<Homepage />} />
+            )}
+            
+            {/* Employee 路由 */}
+            {userRole === 'Employee' && (
+              <Route path="/staff/*" element={<StaffHomepage />} />
+            )}
+            
+            {/* 預設重定向 */}
+            <Route 
+              path="/" 
+              element={
+                userRole === 'Employee' 
+                  ? <Navigate to="/staff" replace /> 
+                  : <Navigate to="/hr" replace />
+              } 
+            />
+            
+            {/* 捕獲所有路由的重定向 */}
+            <Route 
+              path="*" 
+              element={
+                userRole === 'Employee' 
+                  ? <Navigate to="/staff" replace /> 
+                  : <Navigate to="/hr" replace />
+              } 
+            />
+          </>
         )}
-        
-        {/* Default redirects based on role */}
-        <Route 
-          path="/" 
-          element={
-            userRole === 'Employee' 
-              ? <Navigate to="/staff" replace /> 
-              : <Navigate to="/hr" replace />
-          } 
-        />
-        
-        {/* Catch-all redirect */}
-        <Route 
-          path="*" 
-          element={
-            userRole === 'Employee' 
-              ? <Navigate to="/staff" replace /> 
-              : <Navigate to="/hr" replace />
-          } 
-        />
       </Routes>
     </Router>
   );
