@@ -125,16 +125,16 @@ export default function ButtonAppBar() {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <Home />, path: '/', category: 'main' },
-    { text: 'Staff Management', icon: <Users />, path: '/staffs', category: 'hr' },
-    { text: 'User Accounts', icon: <ContactRound />, path: '/user-accounts', category: 'hr' },
-    { text: 'Attendance', icon: <Calendar />, path: '/attendance', category: 'hr' }, 
-    { text: 'Leave Management', icon: <FileHeart />, path: '/leave-management', category: 'hr' }, 
-    { text: 'Salary', icon: <CircleDollarSign />, path: '/salary', category: 'payroll' },
-    { text: 'Payroll', icon: <Landmark />, path: '/payroll', category: 'payroll' },
-    { text: 'Position', icon: <Smile />, path: '/position', category: 'org' },
-    { text: 'Department', icon: <Building2 />, path: '/department', category: 'org' },
-    { text: 'Settings', icon: <Settings />, path: '/settings', category: 'system' },
+    { text: 'Dashboard', icon: <Home />, path: '/hr/', category: 'main' },
+    { text: 'Staff Management', icon: <Users />, path: '/hr/staffs', category: 'hr' },
+    { text: 'User Accounts', icon: <ContactRound />, path: '/hr/user-accounts', category: 'hr' },
+    { text: 'Attendance', icon: <Calendar />, path: '/hr/attendance', category: 'hr' }, 
+    { text: 'Leave Management', icon: <FileHeart />, path: '/hr/leave-management', category: 'hr' }, 
+    { text: 'Salary', icon: <CircleDollarSign />, path: '/hr/salary', category: 'payroll' },
+    { text: 'Payroll', icon: <Landmark />, path: '/hr/payroll', category: 'payroll' },
+    { text: 'Position', icon: <Smile />, path: '/hr/position', category: 'org' },
+    { text: 'Department', icon: <Building2 />, path: '/hr/department', category: 'org' },
+    { text: 'Settings', icon: <Settings />, path: '/hr/settings', category: 'system' },
     { text: 'Sign Out', icon: <LogOut />, path: '/logout', category: 'auth', isLogout: true }
   ];
 

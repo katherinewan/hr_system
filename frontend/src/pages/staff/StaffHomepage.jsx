@@ -6,7 +6,7 @@ import {
   Clock, 
   TrendingUp
 } from 'lucide-react';
-import Header from '../../components/Header_staff.jsx';
+import Header_staff from '../../components/Header_staff.jsx';
 import StaffDashboard from './StaffDashboard.jsx';
 import StaffProfile from './StaffProfile.jsx';
 import Attendance from './StaffAttendance.jsx'; 
@@ -16,7 +16,7 @@ import Payslip from './StaffPayslip.jsx';
 // Layout Component
 const Layout = ({ children }) => (
   <div>
-    <Header />
+    <Header_staff />
     {children}
   </div>
 );
@@ -52,15 +52,6 @@ const DashboardHome = () => {
 
     return () => clearInterval(timer);
   }, []);
-
-  const quickStats = [
-    { label: 'Active Employees', value: '156', icon: Users, color: 'blue' },
-    { label: 'Present Today', value: '142', icon: UserCheck, color: 'green' },
-    { label: 'Pending Reviews', value: '8', icon: Clock, color: 'orange' },
-    { label: 'New Hires', value: '3', icon: TrendingUp, color: 'purple' }
-  ];
-
-
 
   return (
     <div className="dashboard-container">

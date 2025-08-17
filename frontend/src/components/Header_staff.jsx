@@ -57,11 +57,20 @@ export default function ButtonAppBar() {
     setDrawerOpen(open);
   };
 
-  // 處理導航點擊
   const handleNavigation = (path) => {
     console.log('Navigating to:', path);
     try {
-      navigate(path);
+      // 使用相對路徑導航
+      if (path === '/') {
+        navigate('/staff/');
+      } else if (path.startsWith('/staff/')) {
+        navigate(path);
+      } else if (path !== '/logout') {
+        // 對於非登出的路径，自動加上 /staff 前綴
+        navigate(`/staff${path}`);
+      } else {
+        navigate(path);
+      }
       setDrawerOpen(false);
       console.log('Navigation successful to:', path);
     } catch (error) {
@@ -118,12 +127,12 @@ export default function ButtonAppBar() {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <Home />, path: '/'},
-    { text: 'Staff Profile', icon: <Users />, path: '/staff-profile'}, // 改這裡
-    { text: 'Attendance', icon: <Calendar />, path: '/attendance'}, 
-    { text: 'Leave Management', icon: <FileHeart />, path: '/leave'}, // 也要改這個
-    { text: 'Payslip', icon: <CircleDollarSign />, path: '/payslip'}, // 還有這個
-    { text: 'Settings', icon: <Settings />, path: '/settings', category: 'system' },
+    { text: 'Dashboard', icon: <Home />, path: '/staff/' }, // 或 '/staff'
+    { text: 'Staff Profile', icon: <Users />, path: '/staff/staff-profile'}, // 加上 /staff 前綴
+    { text: 'Attendance', icon: <Calendar />, path: '/staff/attendance'}, 
+    { text: 'Leave Management', icon: <FileHeart />, path: '/staff/leave'}, 
+    { text: 'Payslip', icon: <CircleDollarSign />, path: '/staff/payslip'}, 
+    { text: 'Settings', icon: <Settings />, path: '/staff/settings', category: 'system' },
     { text: 'Sign Out', icon: <LogOut />, path: '/logout', category: 'auth', isLogout: true }
   ];
   

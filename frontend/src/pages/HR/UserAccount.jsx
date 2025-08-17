@@ -37,8 +37,15 @@ const UserAccountManagementSystem = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // API base URL
-  const API_BASE_URL = 'http://localhost:3001/api';
+  // API
+  const getApiUrl = () => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return 'http://localhost:3001';
+    }
+    return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  };
+
+  const API_BASE_URL = `${getApiUrl()}/api`;
 
   // Show error message
   const showError = (message) => {

@@ -16,15 +16,6 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-/**
- * Salary Management Component - Connected to Real API
- * 
- * This component connects to your backend API endpoints:
- * - GET /api/salaries (fetch all salaries)
- * - POST /api/salaries (create new salary)
- * - PUT /api/salaries/:id (update salary)
- * - DELETE /api/salaries/:id (delete salary)
- */
 const SalaryManagement = () => {
   const [salaries, setSalaries] = useState([]);
   const [filteredSalaries, setFilteredSalaries] = useState([]);
@@ -70,15 +61,15 @@ const SalaryManagement = () => {
     { id: 'Customer Service', name: 'Customer Service Department' }
   ]);
 
-  // API Base URL - Safe way to access environment variables
-  const getApiBaseUrl = () => {
-    try {
-      return process?.env?.REACT_APP_API_URL || 'http://localhost:3001/api';
-    } catch (error) {
-      return 'http://localhost:3001/api';
+  // API
+  const getApiUrl = () => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return 'http://localhost:3001';
     }
+    return import.meta.env.VITE_API_URL || 'http://localhost:3001';
   };
-  const API_BASE_URL = getApiBaseUrl();
+
+  const API_BASE_URL = `${getApiUrl()}/api`;
 
   // Show success message
   const showSuccess = (message) => {
