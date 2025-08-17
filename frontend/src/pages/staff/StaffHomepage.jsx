@@ -6,7 +6,7 @@ import {
   Clock, 
   TrendingUp
 } from 'lucide-react';
-import Header from '../../components/Header_staff';
+import Header from '../../components/Header_staff.jsx';
 import StaffDashboard from './StaffDashboard';
 import StaffProfile from './StaffProfile';
 import Attendance from './StaffAttendance'; 

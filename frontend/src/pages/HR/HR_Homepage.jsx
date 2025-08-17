@@ -12,7 +12,7 @@ import {
   Calendar,
   TrendingUp
 } from 'lucide-react';
-import Header from '../components/Header';
+import Header from '../../components/Header.jsx';
 import Staffinfo from './Staffinfo';
 import UserAccount from './UserAccount'; 
 import Attendance from './All_Attendance'; 
