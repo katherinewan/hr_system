@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// 現有組件
-import LoginForm from './components/LoginForm';
-import Dashboard from './components/Dashboard';
+// 修正後的組件導入路徑
+import LoginForm from './components/Loginform';  
 
-// 新的假期管理組件
-import StaffLeave from './components/StaffLeave';
-import HRDashboard from './components/HRDashboard';
+// HR 相關組件
+import HRHomepage from './pages/HR/HR_Homepage';  // HR 主頁面
+
+// Staff 相關組件  
+import StaffHomepage from './pages/staff/StaffHomepage';  // Staff 主頁面
+import StaffLeave from './pages/staff/StaffLeave';
 
 // Auth Hook
 const useAuth = () => {
@@ -67,136 +69,6 @@ const ProtectedRoute = ({ children, allowedRoles, user }) => {
   return children;
 };
 
-// Layout Component with Navigation
-const Layout = ({ children, user, logout }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const navigationItems = [
-    { 
-      path: '/dashboard', 
-      label: '儀表板', 
-      roles: ['Admin', 'HR', 'Manager', 'Employee'] 
-    },
-    { 
-      path: '/staff', 
-      label: '我的假期', 
-      roles: ['Employee', 'Manager'] 
-    },
-    { 
-      path: '/hr', 
-      label: '假期審批', 
-      roles: ['HR', 'Admin'] 
-    }
-  ];
-
-  const availableNavigation = navigationItems.filter(item => 
-    item.roles.includes(user?.role)
-  );
-
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Sidebar */}
-      <nav style={{
-        width: sidebarOpen ? '250px' : '60px',
-        backgroundColor: '#ffffff',
-        boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
-        transition: 'width 0.3s ease',
-        position: 'fixed',
-        height: '100vh',
-        zIndex: 1000
-      }}>
-        {/* Sidebar Header */}
-        <div style={{
-          padding: '16px',
-          borderBottom: '1px solid #e5e7eb',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: sidebarOpen ? 'space-between' : 'center'
-        }}>
-          {sidebarOpen && (
-            <span style={{ fontWeight: '700', color: '#2e382e' }}>HR系統</span>
-          )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px'
-            }}
-          >
-            {sidebarOpen ? '✕' : '☰'}
-          </button>
-        </div>
-
-        {/* Navigation Links */}
-        <div style={{ padding: '16px 0' }}>
-          {availableNavigation.map((item) => (
-            <a
-              key={item.path}
-              href={item.path}
-              style={{
-                display: 'block',
-                padding: sidebarOpen ? '12px 16px' : '12px',
-                color: '#6b7280',
-                textDecoration: 'none',
-                transition: 'background-color 0.2s',
-                textAlign: sidebarOpen ? 'left' : 'center'
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                window.location.href = item.path;
-              }}
-            >
-              {sidebarOpen ? item.label : item.label.charAt(0)}
-            </a>
-          ))}
-        </div>
-
-        {/* User Info & Logout */}
-        <div style={{
-          position: 'absolute',
-          bottom: '0',
-          width: '100%',
-          borderTop: '1px solid #e5e7eb',
-          padding: '16px'
-        }}>
-          {sidebarOpen && (
-            <div style={{ marginBottom: '12px', fontSize: '0.875rem' }}>
-              <div style={{ fontWeight: '600', color: '#2e382e' }}>{user?.name}</div>
-              <div style={{ color: '#6b7280' }}>{user?.role}</div>
-            </div>
-          )}
-          <button
-            onClick={logout}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: 'none',
-              background: 'none',
-              color: '#ef4444',
-              cursor: 'pointer',
-              textAlign: sidebarOpen ? 'left' : 'center'
-            }}
-          >
-            {sidebarOpen ? '登出' : '↪'}
-          </button>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main style={{
-        marginLeft: sidebarOpen ? '250px' : '60px',
-        transition: 'margin-left 0.3s ease',
-        width: '100%',
-        overflow: 'auto'
-      }}>
-        {children}
-      </main>
-    </div>
-  );
-};
-
 // Unauthorized Page
 const UnauthorizedPage = () => (
   <div style={{
@@ -251,36 +123,46 @@ const App = () => {
           element={user ? <Navigate to="/dashboard" replace /> : <LoginForm />} 
         />
 
-        {/* Protected Routes */}
+        {/* Dashboard Route - 根據角色重定向 */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute user={user} allowedRoles={['Admin', 'HR', 'Manager', 'Employee']}>
-              <Layout user={user} logout={logout}>
-                <Dashboard />
-              </Layout>
+              {user?.role === 'HR' || user?.role === 'Admin' ? (
+                <Navigate to="/hr" replace />
+              ) : (
+                <Navigate to="/staff" replace />
+              )}
             </ProtectedRoute>
           }
         />
 
+        {/* HR Routes - 使用通配符路由 */}
         <Route
-          path="/staff"
-          element={
-            <ProtectedRoute user={user} allowedRoles={['Employee', 'Manager']}>
-              <Layout user={user} logout={logout}>
-                <StaffLeave />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/hr"
+          path="/hr/*"
           element={
             <ProtectedRoute user={user} allowedRoles={['HR', 'Admin']}>
-              <Layout user={user} logout={logout}>
-                <HRDashboard />
-              </Layout>
+              <HRHomepage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Staff Routes - 使用通配符路由 */}
+        <Route
+          path="/staff/*"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['Employee', 'Manager']}>
+              <StaffHomepage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 兼容舊路由 */}
+        <Route
+          path="/staff-leave"
+          element={
+            <ProtectedRoute user={user} allowedRoles={['Employee', 'Manager']}>
+              <StaffLeave />
             </ProtectedRoute>
           }
         />
