@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import logo from '../assets/Logo.png';
 
 const LoginPage = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     staff_id: '',
     password: '',
@@ -29,6 +31,23 @@ const LoginPage = () => {
     setShowPassword(!showPassword);
   };
 
+  // Role-based navigation function
+  const navigateBasedOnRole = (userRole) => {
+    switch (userRole) {
+      case 'Employee':
+        navigate('/staff');
+        break;
+      case 'HR':
+      case 'Admin':
+        navigate('/hr');
+        break;
+      default:
+        console.warn('Unknown role:', userRole);
+        navigate('/staff'); // Default to staff page
+        break;
+    }
+  };
+
   // Handle login
   const handleLogin = async () => {
     setError('');
@@ -49,9 +68,12 @@ const LoginPage = () => {
         return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       };
 
-      console.log('📄 Using real backend login');
+      console.log('Using real backend login');
       
-      // 🚨 Real backend API call
+      // Real backend API call with better error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch(`${getApiUrl()}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -61,17 +83,27 @@ const LoginPage = () => {
           staff_id: formData.staff_id,
           password: formData.password
         }),
+        signal: controller.signal
       });
 
-      const data = await response.json();
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        // Handle role permission errors
+        // Handle specific HTTP errors
         if (response.status === 403) {
+          const data = await response.json();
           throw new Error(data.message || 'Insufficient permissions, only admins and HR personnel can log in');
         }
-        throw new Error(data.message || 'Login failed');
+        if (response.status === 401) {
+          throw new Error('Invalid staff ID or password');
+        }
+        if (response.status >= 500) {
+          throw new Error('Server error. Please try again later.');
+        }
+        throw new Error('Login failed. Please check your credentials.');
       }
+
+      const data = await response.json();
 
       if (data.success) {
         setSuccess('Login successful! Redirecting...');
@@ -80,6 +112,7 @@ const LoginPage = () => {
         const { user, token } = data.data;
         
         console.log('Ready to save to localStorage:', { user, token });
+        console.log('User role detected:', user.role);
         
         try {
           localStorage.setItem('authToken', token);
@@ -106,9 +139,9 @@ const LoginPage = () => {
           console.error('Failed to save to localStorage:', error);
         }
 
-        // Delay redirect to let user see success message
+        // Delay redirect to let user see success message, then navigate based on role
         setTimeout(() => {
-          console.log('Login successful, ready to redirect to HR system');
+          console.log('Login successful, navigating based on role:', user.role);
           
           // Final verification of localStorage
           const finalToken = localStorage.getItem('authToken');
@@ -121,11 +154,22 @@ const LoginPage = () => {
           // Trigger login success event to notify App.jsx to update auth state
           window.dispatchEvent(new Event('loginSuccess'));
           
+          // Navigate based on user role
+          navigateBasedOnRole(user.role);
+          
         }, 1500);
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.message);
+      
+      // Handle different types of errors
+      if (error.name === 'AbortError') {
+        setError('Connection timeout. Please check your internet connection and try again.');
+      } else if (error.message.includes('fetch')) {
+        setError('Unable to connect to server. Please ensure the backend is running and try again.');
+      } else {
+        setError(error.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -203,7 +247,9 @@ const LoginPage = () => {
             justifyContent: 'center',
             boxShadow: '0 8px 25px -8px rgba(37, 78, 112, 0.3)',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            border: '2px solid #d1d5db',
+            backgroundColor: '#f9fafb'
           }}>
             {/* Shimmer Effect */}
             <div style={{

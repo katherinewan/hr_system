@@ -1,25 +1,28 @@
 import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/HR/Loginform';
 import Homepage from './pages/HR/HR_Homepage';
 import StaffHomepage from './pages/staff/StaffHomepage';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     checkAuthentication();
     
-    // 監聽登入成功事件
+    // Listen for login success events
     const handleLoginSuccess = () => {
-      console.log('🔔 收到登入成功事件');
+      console.log('Received login success event');
       checkAuthentication();
     };
 
-    // 監聽登出事件
+    // Listen for logout events
     const handleLogout = () => {
-      console.log('🔔 收到登出事件');
+      console.log('Received logout event');
       setIsAuthenticated(false);
+      setUserRole(null);
     };
 
     window.addEventListener('loginSuccess', handleLoginSuccess);
@@ -36,49 +39,50 @@ export default function App() {
       const token = localStorage.getItem('authToken');
       const userInfo = localStorage.getItem('userInfo');
       
-      console.log('檢查認證狀態 - 原始數據:', { 
+      console.log('Checking authentication status:', { 
         tokenExists: !!token, 
-        userInfoExists: !!userInfo,
-        tokenValue: token,
-        userInfoValue: userInfo
+        userInfoExists: !!userInfo
       });
       
       if (token && userInfo) {
         try {
           const user = JSON.parse(userInfo);
-          console.log('解析的用戶資訊:', user);
+          console.log('Parsed user info:', user);
           
-          // 檢查用戶角色是否為 Admin 或 HR
-          if (user.role === 'Admin' || user.role === 'HR') {
-            console.log('✅ 認證成功，角色:', user.role);
+          // Check if user role is valid (Admin, HR, or Employee)
+          if (user.role === 'Admin' || user.role === 'HR' || user.role === 'Employee') {
+            console.log('Authentication successful, role:', user.role);
             setIsAuthenticated(true);
-            return; // 早期返回，避免設置為 false
+            setUserRole(user.role);
+            return;
           } else {
-            console.log('❌ 角色權限不足:', user.role);
-            // 清除無效的認證資訊
+            console.log('Invalid role:', user.role);
+            // Clear invalid authentication data
             localStorage.removeItem('authToken');
             localStorage.removeItem('userInfo');
           }
         } catch (parseError) {
-          console.error('解析用戶資訊失敗:', parseError);
-          // 清除損壞的數據
+          console.error('Failed to parse user info:', parseError);
+          // Clear corrupted data
           localStorage.removeItem('authToken');
           localStorage.removeItem('userInfo');
         }
       } else {
-        console.log('❌ 未找到完整的認證資訊');
+        console.log('No complete authentication data found');
       }
       
       setIsAuthenticated(false);
+      setUserRole(null);
     } catch (error) {
-      console.error('認證檢查錯誤:', error);
+      console.error('Authentication check error:', error);
       setIsAuthenticated(false);
+      setUserRole(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 載入中狀態
+  // Loading state
   if (isLoading) {
     return (
       <div style={{
@@ -105,18 +109,62 @@ export default function App() {
             borderTopColor: 'white',
             animation: 'spin 1s linear infinite'
           }}></div>
-          <div>檢查認證狀態...</div>
+          <div>Checking authentication...</div>
         </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }
 
-  // 根據認證狀態渲染不同組件
-  if (isAuthenticated) {
-    console.log('渲染 Homepage 組件');
-    return <Homepage />;
-  } else {
-    console.log('渲染 Login 組件');
-    return <Login />;
+  // If not authenticated, show login
+  if (!isAuthenticated) {
+    console.log('Rendering Login component');
+    return (
+      <Router>
+        <Login />
+      </Router>
+    );
   }
+
+  // If authenticated, render based on role with routing
+  console.log('Rendering authenticated app for role:', userRole);
+  return (
+    <Router>
+      <Routes>
+        {/* HR and Admin routes */}
+        {(userRole === 'HR' || userRole === 'Admin') && (
+          <Route path="/hr/*" element={<Homepage />} />
+        )}
+        
+        {/* Employee routes */}
+        {userRole === 'Employee' && (
+          <Route path="/staff/*" element={<StaffHomepage />} />
+        )}
+        
+        {/* Default redirects based on role */}
+        <Route 
+          path="/" 
+          element={
+            userRole === 'Employee' 
+              ? <Navigate to="/staff" replace /> 
+              : <Navigate to="/hr" replace />
+          } 
+        />
+        
+        {/* Catch-all redirect */}
+        <Route 
+          path="*" 
+          element={
+            userRole === 'Employee' 
+              ? <Navigate to="/staff" replace /> 
+              : <Navigate to="/hr" replace />
+          } 
+        />
+      </Routes>
+    </Router>
+  );
 }
