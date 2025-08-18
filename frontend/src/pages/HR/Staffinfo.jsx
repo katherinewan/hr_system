@@ -19,7 +19,7 @@ const EmployeeManagementSystem = () => {
     staff_id: '',
     name: '',
     nickname: '',
-    gender: 'male',
+    gender: '',
     age: '',
     hire_date: '',
     email: '',
@@ -174,15 +174,9 @@ const EmployeeManagementSystem = () => {
   };
 
   // Format date display
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US');
-  };
-
-  // Format input date (YYYY-MM-DD)
-  const formatDateForInput = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toISOString().split('T')[0];
+  const formatDate = (dbDate) => {
+    if (!dbDate) return 'N/A';
+    return formatDisplayDate(dbDate);
   };
 
   // Format gender display
@@ -232,15 +226,41 @@ const EmployeeManagementSystem = () => {
     }
   };
 
+  // 工具函数：将数据库格式 (MM-DD-YYYY) 转换为 YYYY-MM-DD (用于<input type="date">)
+  const dbDateToInputFormat = (dbDate) => {
+    if (!dbDate) return '';
+    const [month, day, year] = dbDate.split('-');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
+
+  // 工具函数：将数据库格式 (MM-DD-YYYY) 转换为 DD-MM-YYYY (用于显示)
+  const formatDisplayDate = (dbDate) => {
+    if (!dbDate) return 'N/A';
+    const [month, day, year] = dbDate.split('-');
+    return `${day}-${month}-${year}`;
+  };
+
+  // 工具函数：将 YYYY-MM-DD (来自<input>) 转回数据库格式 (MM-DD-YYYY)
+  const inputDateToDbFormat = (inputDate) => {
+    if (!inputDate) return '';
+    const [year, month, day] = inputDate.split('-');
+    return `${month}-${day}-${year}`;
+  };
+
+  const formatDateForInput = (dateString) => {
+  if (!dateString) return '';
+  return new Date(dateString).toISOString().split('T')[0];
+  };
+
   // Start editing staff
   const startEditing = (staff) => {
     setEditingStaff(staff.staff_id);
     setEditForm({
       name: staff.name || '',
       nickname: staff.nickname || '',
-      gender: staff.gender || 'male',
+      gender: staff.gender ? staff.gender.toLowerCase() : 'male',
       age: staff.age || '',
-      hire_date: formatDateForInput(staff.hire_date),
+      hire_date: dbDateToInputFormat(staff.hire_date),
       email: staff.email || '',
       address: staff.address || '',
       phone_number: staff.phone_number || '',
@@ -352,9 +372,11 @@ const EmployeeManagementSystem = () => {
 
   // Update staff
   const updateStaff = async (staffId) => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
+      const dataToSend = {
+        ...editForm,
+        hire_date: inputDateToDbFormat(editForm.hire_date)
+      };
     
     setIsUpdating(true);
     
@@ -364,7 +386,7 @@ const EmployeeManagementSystem = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(dataToSend),
       });
       
       const data = await response.json();
@@ -392,9 +414,11 @@ const EmployeeManagementSystem = () => {
 
   // Add staff
   const addStaff = async () => {
-    if (!validateAddForm()) {
-      return;
-    }
+    if (!validateAddForm()) return;
+    const dataToSend = {
+      ...addForm,
+      hire_date: inputDateToDbFormat(addForm.hire_date)
+    };
     
     setIsAdding(true);
     
@@ -404,7 +428,7 @@ const EmployeeManagementSystem = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(addForm),
+        body: JSON.stringify(dateToSend),
       });
       
       const data = await response.json();
@@ -418,7 +442,7 @@ const EmployeeManagementSystem = () => {
           staff_id: '',
           name: '',
           nickname: '',
-          gender: 'male',
+          gender: '',
           age: '',
           hire_date: '',
           email: '',
@@ -453,7 +477,7 @@ const EmployeeManagementSystem = () => {
       staff_id: '',
       name: '',
       nickname: '',
-      gender: 'male',
+      gender: '',
       age: '',
       hire_date: new Date().toISOString().split('T')[0], // Default to today
       email: '',
@@ -472,7 +496,7 @@ const EmployeeManagementSystem = () => {
     setAddForm({
       name: '',
       nickname: '',
-      gender: 'male',
+      gender: '',
       age: '',
       hire_date: '',
       email: '',

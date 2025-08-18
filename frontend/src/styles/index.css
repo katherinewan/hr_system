@@ -476,7 +476,7 @@ body {
 }
 
 .table-row td {
-  padding: 1.25rem 1rem;
+  padding: 1rem 0.6rem;
   font-size: 0.875rem;
   vertical-align: middle;
 }
@@ -485,7 +485,7 @@ body {
 .staff-id {
   color: #254e70;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.875rem;
 }
 
 .gender-badge,
@@ -1244,7 +1244,7 @@ body {
 
   .table-header th,
   .table-row td {
-    padding: 0.75rem 0.5rem;
+    padding: 0.5rem 0.5rem;
   }
 
   .modal-content {
