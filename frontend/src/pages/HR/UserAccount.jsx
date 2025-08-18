@@ -34,8 +34,22 @@ const UserAccountManagementSystem = () => {
   const [filteredStaff, setFilteredStaff] = useState([]);
   const [showStaffDropdown, setShowStaffDropdown] = useState(false);
   const [formErrors, setFormErrors] = useState({});
-  const [isCreating, setIsCreating] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Add employee related state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    user_id: '',
+    staff_id: '',
+    password: '',
+    role: '',
+    last_login: '',
+    password_reset_expires: '',
+    failed_login_attempts: '',
+    account_locked: ''
+  });
+  const [addValidationErrors, setAddValidationErrors] = useState({});
 
   // API
   const getApiUrl = () => {
@@ -138,75 +152,19 @@ const UserAccountManagementSystem = () => {
     }
   };
 
-  // Enhanced search users with unified search logic
-  const searchUsers = async (searchTerm) => {
-    if (!searchTerm || !searchTerm.trim()) {
-      loadAllUsers();
-      return;
-    }
-
-    const trimmedInput = searchTerm.trim();
-    setLoading(true);
-    clearError();
+  const filteredUsers = userList.filter(user => {
+    if (!searchInput.trim()) return true;
     
-    try {
-      let response;
-      
-      if (/^\d+$/.test(trimmedInput)) {
-        console.log(`Searching by user ID: ${trimmedInput}`);
-        response = await fetch(`${API_BASE_URL}/users/${trimmedInput}`);
-      } else {
-        console.log(`Searching by name: ${trimmedInput}`);
-        const params = new URLSearchParams();
-        params.append('name', trimmedInput);
-        response = await fetch(`${API_BASE_URL}/users/search?${params.toString()}`);
-      }
-      
-      const data = await response.json();
-      console.log('Search response:', data);
-      
-      if (response.ok && data) {
-        if (data.success) {
-          let userData;
-          if (Array.isArray(data.data)) {
-            userData = data.data;
-          } else {
-            userData = [data.data];
-          }
-          
-          const count = data.count || userData.length;
-          setUserList(userData);
-          setResultTitle(`Search results for "${trimmedInput}" (Total: ${count} accounts)`);
-          setCurrentView('table');
-        } else {
-          showError(data.message || 'User data not found');
-        }
-      } else {
-        if (response.status === 404) {
-          showError(`User "${trimmedInput}" not found`);
-        } else {
-          showError(data.message || 'Error occurred during search');
-        }
-      }
-    } catch (error) {
-      showError('Error occurred during search, please check network connection');
-      console.error('Search error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const searchTerm = searchInput.toLowerCase().trim();
+    return (
+      user.name.toLowerCase().includes(searchTerm) ||
+      user.staff_id.toString().includes(searchTerm)
+    );
+  });
 
   // Clear results
   const clearResults = () => {
     setSearchInput('');
-    loadAllUsers();
-  };
-
-  // Handle search input with Enter key support
-  const handleSearch = (e) => {
-    if (e.key === 'Enter') {
-      searchUsers(searchInput);
-    }
   };
 
   // Real-time search as user types
@@ -237,14 +195,14 @@ const UserAccountManagementSystem = () => {
     setValidationErrors({});
   };
 
-  // Handle form input changes
+  // Handle edit form input changes
   const handleFormChange = (field, value) => {
+    console.log(`Form change: ${field} = ${value}`);
     setEditForm(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Clear validation error for this field
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
         ...prev,
@@ -253,39 +211,18 @@ const UserAccountManagementSystem = () => {
     }
   };
 
-  // Update user
-  const updateUser = async (userId) => {
-    setIsUpdating(true);
+  // Handle add staff form input changes
+  const handleAddFormChange = (field, value) => {
+    setAddForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
     
-    try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editForm),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        // Update user in local state
-        setUserList(prev => prev.map(user => 
-          user.user_id === userId 
-            ? { ...user, ...editForm }
-            : user
-        ));
-        
-        cancelEditing();
-        showSuccess('User updated successfully');
-      } else {
-        setError(data.message || 'Failed to update user');
-      }
-    } catch (error) {
-      setError('Error occurred while updating user');
-      console.error('Update error:', error);
-    } finally {
-      setIsUpdating(false);
+    if (addValidationErrors[field]) {
+      setAddValidationErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
     }
   };
 
@@ -363,71 +300,138 @@ const UserAccountManagementSystem = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Handle adding new user
-  const handleAddNewUser = async () => {
+  // Update User
+  const updateUser = async (staffID) => {
     if (!validateForm()) {
       return;
     }
+    
+    setIsUpdating(true);
+    
+    try {
+      const completeData = {
+        password: editForm.password || '',
+        role: editForm.role || '',
+        last_login: editForm.last_login || '',
+        password_reset_expires: editForm.password_reset_expires || '',
+        failed_login_attempts: editForm.failed_login_attempts || '',
+        account_locked: editForm.account_locked || ''
+      };
+      
+      console.log('Updating user with complete data:', completeData);
+      console.log('Staff ID:', staffID);
+      
+      const response = await fetch(`${API_BASE_URL}/users/${staffID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(completeData),
+      });
+      
+      const data = await response.json();
+      console.log('Update response:', data);
+      
+      if (response.ok && data.success) {
+        setStaffList(prev => prev.map(user => 
+          user.staff_id === staffID 
+            ? { ...user, ...completeData }
+            : user
+        ));
+        
+        cancelEditing();
+        showSuccess('User information updated successfully');
+      } else {
+        console.error('Update failed:', data);
+        setError(data.message || 'Failed to update user');
+      }
+    } catch (error) {
+      setError('Error occurred while updating user');
+      console.error('Update error:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
-    setIsCreating(true);
-
+  // Add User
+  const addStaff = async () => {
+    if (!validateAddForm()) {
+      return;
+    }
+    
+    setIsAdding(true);
+    
     try {
       const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          staff_id: newUserData.selectedStaff.staff_id,
-          password: newUserData.password,
-          role: newUserData.role
-        })
+        body: JSON.stringify(addForm),
       });
-
+      
       const data = await response.json();
-
+      
       if (response.ok && data.success) {
-        // Add new user to local state (including staff information)
-        const newUserWithStaffInfo = {
-          ...data.data,
-          staff_name: newUserData.selectedStaff.name
-        };
-        setUserList(prev => [...prev, newUserWithStaffInfo]);
-
-        // Reset new user form and close modal
-        resetAddUserForm();
-        setShowAddUserModal(false);
-
-        showSuccess(`Successfully created user account for ${newUserData.selectedStaff.name}`);
-
-        // Refresh list to get updated count
-        loadAllUsers();
+        setStaffList(prev => [...prev, data.data]);
+        
+        setAddForm({
+          user_id: '',
+          staff_id: '',
+          password: '',
+          role: '',
+          last_login: '',
+          password_reset_expires: '',
+          failed_login_attempts: '',
+          account_locked: ''
+        });
+        setAddValidationErrors({});
+        setShowAddModal(false);
+        
+        showSuccess('User member added successfully');
+        loadAllStaff();
       } else {
-        setError(data.message || 'Failed to create user account');
+        setError(data.message || 'Failed to add user member');
       }
     } catch (error) {
-      setError('Error occurred while creating user account');
-      console.error('Add user error:', error);
+      setError('Error occurred while adding user member');
+      console.error('Add error:', error);
     } finally {
-      setIsCreating(false);
+      setIsAdding(false);
     }
   };
 
-  // Reset new user form
-  const resetAddUserForm = () => {
-    setNewUserData({
+  // Replace in openAddUserModal and closeAddUserModal:
+
+  const openAddUserModal = () => {
+    setShowAddUserModal(true);
+    setAddForm({
+      user_id: '',
       staff_id: '',
       password: '',
-      confirmPassword: '',
-      role: 'employee',
-      selectedStaff: null
+      role: '',
+      last_login: '',
+      password_reset_expires: '',
+      failed_login_attempts: '',
+      account_locked: ''
     });
-    setStaffSearchInput('');
-    setFilteredStaff(staffList);
-    setShowStaffDropdown(false);
-    setFormErrors({});
-    setShowPassword(false);
-    setShowConfirmPassword(false);
+    setAddValidationErrors({});
+    loadStaffList();
+  };
+
+  const closeAddUserModal = () => {
+    setShowAddUserModal(false);
+    setAddForm({
+      user_id: '',
+      staff_id: '',
+      password: '',
+      role: '',
+      last_login: '',
+      password_reset_expires: '',
+      failed_login_attempts: '',
+      account_locked: ''
+    });
+    setAddValidationErrors({});
   };
 
   // Enhanced staff search with Staff ID support
@@ -484,18 +488,76 @@ const UserAccountManagementSystem = () => {
     setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
   };
 
-  // Open add user modal
-  const openAddUserModal = () => {
-    console.log('Opening create user modal');
-    setShowAddUserModal(true);
-    resetAddUserForm();
-    loadStaffList(); // Load available staff list
+  const validateNewUserForm = () => {
+    const errors = {};
+
+    if (!newUserData.selectedStaff) {
+      errors.staff = 'Please select a staff member';
+    }
+    if (!newUserData.password) {
+      errors.password = 'Password is required';
+    } else if (newUserData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long';
+    }
+    if (!newUserData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm password';
+    } else if (newUserData.password !== newUserData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    if (!newUserData.role) {
+      errors.role = 'Please select a role';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  // Close add user modal
-  const closeAddUserModal = () => {
-    setShowAddUserModal(false);
-    resetAddUserForm();
+  const addUser = async () => {
+    if (!validateNewUserForm()) {
+      return;
+    }
+
+    setIsAdding(true);
+
+    try {
+      const payload = {
+        staff_id: newUserData.staff_id,
+        password: newUserData.password,
+        role: newUserData.role
+      };
+
+      const response = await fetch(`${API_BASE_URL}/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccessMessage('User account created successfully');
+        setShowAddUserModal(false);
+        setNewUserData({
+          staff_id: '',
+          password: '',
+          confirmPassword: '',
+          role: 'employee',
+          selectedStaff: null
+        });
+        setFormErrors({});
+        loadAllUsers();
+        loadStaffList();
+      } else {
+        setFormErrors({ general: data.message || 'Failed to create user account' });
+      }
+    } catch (error) {
+      setFormErrors({ general: 'Error occurred while creating user account' });
+      console.error('Add user error:', error);
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   // Get role badge color
@@ -808,7 +870,6 @@ const UserAccountManagementSystem = () => {
               <button 
                 onClick={closeAddUserModal}
                 className="close-btn"
-                disabled={isCreating}
               >
                 <X size={20} />
               </button>
@@ -816,30 +877,31 @@ const UserAccountManagementSystem = () => {
           </div>
 
           <div className="modal-body">
-            {/* Staff Selection */}
-            <div className="form-group">
-              <label className="form-label-with-icon">
-                <User size={16} />
-                Staff Member <span className="required">*</span>
-              </label>
-              <div className="staff-search-container">
-                <input
-                  type="text"
-                  value={staffSearchInput}
-                  onChange={(e) => handleStaffSearch(e.target.value)}
-                  onFocus={() => {
-                    if (filteredStaff.length > 0) {
-                      setShowStaffDropdown(true);
+            <form onSubmit={(e) => e.preventDefault()}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                <div className="form-group">
+                  <label className="form-label-with-icon">
+                    <User size={16} />
+                    Staff Member <span className="required">*</span>
+                  </label>
+                  <div className="staff-search-container">
+                  <input
+                    type="text"
+                    value={staffSearchInput}
+                    onChange={(e) => handleStaffSearch(e.target.value)}
+                    onFocus={() => {
+                      if (filteredStaff.length > 0) {
+                        setShowStaffDropdown(true);
+                      }
+                    }}
+                    placeholder={
+                      staffList.length === 0 
+                        ? "Loading staff..." 
+                        : "Search by name, staff ID, or email..."
                     }
-                  }}
-                  placeholder={
-                    staffList.length === 0 
-                      ? "Loading staff..." 
-                      : "Search by name, staff ID, or email..."
-                  }
-                  className={`form-input ${formErrors.staff ? 'error' : ''}`}
-                  disabled={staffList.length === 0}
-                />
+                    className={`form-input ${formErrors.staff ? 'error' : ''}`}
+                    disabled={staffList.length === 0}
+                  />
                 <button
                   type="button"
                   onClick={() => {
@@ -1044,17 +1106,17 @@ const UserAccountManagementSystem = () => {
             <button 
               className="btn btn-secondary" 
               onClick={closeAddUserModal}
-              disabled={isCreating}
+              disabled={isAdding}
             >
               Cancel
             </button>
             <button 
               className="btn btn-success" 
-              onClick={handleAddNewUser}
-              disabled={isCreating || !newUserData.selectedStaff}
+              onClick={addUser}
+              disabled={isAdding}
             >
-              {isCreating ? (
-                <>Creating...</>
+              {isAdding ? (
+                'Adding...'
               ) : (
                 <>
                   <UserPlus className="btn-icon" />
@@ -1111,8 +1173,7 @@ const UserAccountManagementSystem = () => {
                 <input
                   type="text"
                   value={searchInput}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  onKeyPress={handleSearch}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search by user ID, staff ID, or name..."
                   className="search-input"
                 />
@@ -1146,11 +1207,6 @@ const UserAccountManagementSystem = () => {
             >
               <UserPlus className="btn-icon" />
               Add Account
-            </button>
-
-            <button className="btn btn-warning">
-              <Shield className="btn-icon" />
-              Manage Roles
             </button>
           </div>
         </div>

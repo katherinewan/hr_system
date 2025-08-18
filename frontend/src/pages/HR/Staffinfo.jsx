@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, Trash2, UserPlus, Edit3, Save, X, Plus } from 'lucide-react';
+import { Search, Users, Trash2, UserPlus, Edit3, Save, X, Plus, Loader } from 'lucide-react';
 
 const EmployeeManagementSystem = () => {
   const [staffList, setStaffList] = useState([]);
@@ -19,7 +19,7 @@ const EmployeeManagementSystem = () => {
     staff_id: '',
     name: '',
     nickname: '',
-    gender: '',
+    gender: 'male',
     age: '',
     hire_date: '',
     email: '',
@@ -158,25 +158,57 @@ const EmployeeManagementSystem = () => {
   // Clear results
   const clearResults = () => {
     setSearchInput('');
-    loadAllStaff();
   };
 
-  // Handle search input with Enter key support
-  const handleSearch = (e) => {
-    if (e.key === 'Enter') {
-      searchStaff(searchInput);
+  // Filter staffs based on search input
+  const filteredStaffs = staffList.filter(staff => {
+    if (!searchInput.trim()) return true;
+    
+    const searchTerm = searchInput.toLowerCase().trim();
+    return (
+      staff.name.toLowerCase().includes(searchTerm) ||
+      staff.staff_id.toString().includes(searchTerm) ||
+      (staff.nickname && staff.nickname.toLowerCase().includes(searchTerm)) ||
+      (staff.email && staff.email.toLowerCase().includes(searchTerm))
+    );
+  });
+
+  // Format date display - 修復日期顯示問題
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      // 嘗試直接解析日期
+      const date = new Date(dateString);
+      
+      // 檢查日期是否有效
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return dateString; // 如果無效，返回原始字符串
+      }
+      
+      return date.toLocaleDateString('en-US');
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return dateString;
     }
   };
 
-  // Real-time search as user types
-  const handleSearchChange = (value) => {
-    setSearchInput(value);
-  };
-
-  // Format date display
-  const formatDate = (dbDate) => {
-    if (!dbDate) return 'N/A';
-    return formatDisplayDate(dbDate);
+  // Format input date (YYYY-MM-DD)
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    try {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return dateString;
+      }
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error('Date input formatting error:', error);
+      return '';
+    }
   };
 
   // Format gender display
@@ -226,48 +258,40 @@ const EmployeeManagementSystem = () => {
     }
   };
 
-  // 工具函数：将数据库格式 (MM-DD-YYYY) 转换为 YYYY-MM-DD (用于<input type="date">)
-  const dbDateToInputFormat = (dbDate) => {
-    if (!dbDate) return '';
-    const [month, day, year] = dbDate.split('-');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  };
-
-  // 工具函数：将数据库格式 (MM-DD-YYYY) 转换为 DD-MM-YYYY (用于显示)
-  const formatDisplayDate = (dbDate) => {
-    if (!dbDate) return 'N/A';
-    const [month, day, year] = dbDate.split('-');
-    return `${day}-${month}-${year}`;
-  };
-
-  // 工具函数：将 YYYY-MM-DD (来自<input>) 转回数据库格式 (MM-DD-YYYY)
-  const inputDateToDbFormat = (inputDate) => {
-    if (!inputDate) return '';
-    const [year, month, day] = inputDate.split('-');
-    return `${month}-${day}-${year}`;
-  };
-
-  const formatDateForInput = (dateString) => {
-  if (!dateString) return '';
-  return new Date(dateString).toISOString().split('T')[0];
-  };
-
   // Start editing staff
   const startEditing = (staff) => {
+    console.log('Starting edit for staff:', staff);
+    console.log('Original gender:', staff.gender, 'Type:', typeof staff.gender);
+    console.log('Original hire_date:', staff.hire_date);
+    
     setEditingStaff(staff.staff_id);
-    setEditForm({
+    
+    let genderValue = 'male';
+    if (staff.gender && staff.gender.trim() !== '') {
+      genderValue = staff.gender.toLowerCase().trim();
+    }
+    
+    let hireDateValue = '';
+    if (staff.hire_date) {
+      hireDateValue = formatDateForInput(staff.hire_date);
+    }
+    
+    const formData = {
       name: staff.name || '',
       nickname: staff.nickname || '',
-      gender: staff.gender ? staff.gender.toLowerCase() : 'male',
+      gender: genderValue,
       age: staff.age || '',
-      hire_date: dbDateToInputFormat(staff.hire_date),
+      hire_date: hireDateValue,
       email: staff.email || '',
       address: staff.address || '',
       phone_number: staff.phone_number || '',
       emer_phone: staff.emer_phone || '',
       emer_name: staff.emer_name || '',
       position_id: staff.position_id || ''
-    });
+    };
+    
+    console.log('Setting edit form to:', formData);
+    setEditForm(formData);
     setValidationErrors({});
   };
 
@@ -280,12 +304,12 @@ const EmployeeManagementSystem = () => {
 
   // Handle edit form input changes
   const handleFormChange = (field, value) => {
+    console.log(`Form change: ${field} = ${value}`);
     setEditForm(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Clear validation error for this field
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
         ...prev,
@@ -301,7 +325,6 @@ const EmployeeManagementSystem = () => {
       [field]: value
     }));
     
-    // Clear validation error for this field
     if (addValidationErrors[field]) {
       setAddValidationErrors(prev => ({
         ...prev,
@@ -371,37 +394,53 @@ const EmployeeManagementSystem = () => {
   };
 
   // Update staff
-  const updateStaff = async (staffId) => {
-    if (!validateForm()) return;
-      const dataToSend = {
-        ...editForm,
-        hire_date: inputDateToDbFormat(editForm.hire_date)
-      };
+  const updateStaff = async (staffID) => {
+    if (!validateForm()) {
+      return;
+    }
     
     setIsUpdating(true);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/staff/${staffId}`, {
+      const completeData = {
+        name: editForm.name || '',
+        nickname: editForm.nickname || '',
+        gender: editForm.gender || 'male',
+        age: parseInt(editForm.age) || 0,
+        hire_date: editForm.hire_date || '',
+        email: editForm.email || '',
+        address: editForm.address || '',
+        phone_number: editForm.phone_number || '',
+        emer_phone: editForm.emer_phone || '',
+        emer_name: editForm.emer_name || '',
+        position_id: editForm.position_id || ''
+      };
+      
+      console.log('Updating staff with complete data:', completeData);
+      console.log('Staff ID:', staffID);
+      
+      const response = await fetch(`${API_BASE_URL}/staff/${staffID}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dataToSend),
+        body: JSON.stringify(completeData),
       });
       
       const data = await response.json();
+      console.log('Update response:', data);
       
       if (response.ok && data.success) {
-        // Update staff in local state
         setStaffList(prev => prev.map(staff => 
-          staff.staff_id === staffId 
-            ? { ...staff, ...editForm }
+          staff.staff_id === staffID 
+            ? { ...staff, ...completeData }
             : staff
         ));
         
         cancelEditing();
         showSuccess('Staff information updated successfully');
       } else {
+        console.error('Update failed:', data);
         setError(data.message || 'Failed to update staff');
       }
     } catch (error) {
@@ -414,11 +453,9 @@ const EmployeeManagementSystem = () => {
 
   // Add staff
   const addStaff = async () => {
-    if (!validateAddForm()) return;
-    const dataToSend = {
-      ...addForm,
-      hire_date: inputDateToDbFormat(addForm.hire_date)
-    };
+    if (!validateAddForm()) {
+      return;
+    }
     
     setIsAdding(true);
     
@@ -428,21 +465,19 @@ const EmployeeManagementSystem = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dateToSend),
+        body: JSON.stringify(addForm),
       });
       
       const data = await response.json();
       
       if (response.ok && data.success) {
-        // Add new staff to local state
         setStaffList(prev => [...prev, data.data]);
         
-        // Reset add form and close modal
         setAddForm({
           staff_id: '',
           name: '',
           nickname: '',
-          gender: '',
+          gender: 'male',
           age: '',
           hire_date: '',
           email: '',
@@ -456,8 +491,6 @@ const EmployeeManagementSystem = () => {
         setShowAddModal(false);
         
         showSuccess('Staff member added successfully');
-        
-        // Refresh list to get updated count
         loadAllStaff();
       } else {
         setError(data.message || 'Failed to add staff member');
@@ -477,9 +510,9 @@ const EmployeeManagementSystem = () => {
       staff_id: '',
       name: '',
       nickname: '',
-      gender: '',
+      gender: 'male',
       age: '',
-      hire_date: new Date().toISOString().split('T')[0], // Default to today
+      hire_date: new Date().toISOString().split('T')[0],
       email: '',
       address: '',
       phone_number: '',
@@ -496,7 +529,7 @@ const EmployeeManagementSystem = () => {
     setAddForm({
       name: '',
       nickname: '',
-      gender: '',
+      gender: 'male',
       age: '',
       hire_date: '',
       email: '',
@@ -516,7 +549,6 @@ const EmployeeManagementSystem = () => {
     const hasError = validationErrors[field];
     
     if (!isEditing) {
-      // Display mode
       if (field === 'hire_date') {
         return formatDate(staff[field]);
       } else if (field === 'gender') {
@@ -546,11 +578,11 @@ const EmployeeManagementSystem = () => {
       return staff[field] || 'N/A';
     }
     
-    // Edit mode
     if (field === 'gender') {
+      console.log(`Rendering gender select for ${staff.staff_id}, current value:`, value);
       return (
         <select
-          value={value}
+          value={value || 'male'}
           onChange={(e) => handleFormChange(field, e.target.value)}
           className={`edit-input ${hasError ? 'error' : ''}`}
         >
@@ -564,7 +596,7 @@ const EmployeeManagementSystem = () => {
       <div className="edit-field-container">
         <input
           type={type}
-          value={value}
+          value={value || ''}
           onChange={(e) => handleFormChange(field, e.target.value)}
           className={`edit-input ${hasError ? 'error' : ''}`}
           placeholder={field === 'nickname' ? 'Optional' : ''}
@@ -819,7 +851,8 @@ const EmployeeManagementSystem = () => {
               </tr>
             </thead>
             <tbody>
-              {staffList.map((staff, index) => (
+              {/* 使用 filteredStaffs 進行即時過濾 */}
+              {filteredStaffs.map((staff) => (
                 <tr key={staff.staff_id} className={`table-row ${editingStaff === staff.staff_id ? 'editing' : ''}`}>
                   <td>
                     <strong className="staff-id">{staff.staff_id}</strong>
@@ -899,6 +932,7 @@ const EmployeeManagementSystem = () => {
     if (loading) {
       return (
         <div className="loading-state">
+          <Loader size={48} className="animate-spin" />
           <div>Loading staff data...</div>
         </div>
       );
@@ -946,8 +980,7 @@ const EmployeeManagementSystem = () => {
                 <input
                   type="text"
                   value={searchInput}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  onKeyPress={handleSearch}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search by staff ID or name..."
                   className="search-input"
                 />

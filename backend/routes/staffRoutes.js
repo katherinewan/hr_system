@@ -90,7 +90,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/staff/:id - 根據 ID 獲取單個員工
+// GET /api/staff/:staff_id - 根據 ID 獲取單個員工
 router.get('/:id', async (req, res) => {
   try {
     const staffId = req.params.id;

@@ -248,10 +248,10 @@ const createStaff = async (req, res) => {
   }
 };
 
-// 更新員工
+// 更新員工 - 完全修復版本
 const updateStaff = async (req, res) => {
   try {
-    const { staff_id } = req.params;
+    const { id } = req.params; // 從 URL 獲取 staff_id
     const {
       name,
       nickname,
@@ -264,12 +264,12 @@ const updateStaff = async (req, res) => {
       emer_phone,
       emer_name,
       position_id
-    } = req.body;
+    } = req.body; // 不再嘗試獲取 staff_id
 
-    console.log(`📥 請求：更新員工 ID ${staff_id}`, { name, email });
+    console.log(`📥 請求：更新員工 ID ${id}`, { name, email });
 
     // 驗證 ID 格式
-    if (!/^\d+$/.test(staff_id)) {
+    if (!/^\d+$/.test(id)) {
       return res.status(400).json({
         success: false,
         message: '員工 ID 必須是數字'
@@ -302,18 +302,18 @@ const updateStaff = async (req, res) => {
     }
 
     // 檢查員工是否存在
-    const existingStaff = await pool.query('SELECT staff_id FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
+    const existingStaff = await pool.query('SELECT staff_id FROM staff WHERE staff_id = $1', [parseInt(id)]);
     if (existingStaff.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到員工 ID ${staff_id}`
+        message: `找不到員工 ID ${id}`
       });
     }
 
     // 檢查電子郵件是否被其他員工使用
     const emailCheck = await pool.query(
       'SELECT staff_id FROM staff WHERE email = $1 AND staff_id != $2', 
-      [email, parseInt(staff_id)]
+      [email, parseInt(id)]
     );
     if (emailCheck.rows.length > 0) {
       return res.status(409).json({
@@ -340,20 +340,20 @@ const updateStaff = async (req, res) => {
       RETURNING *
     `, [
       name.trim(),
-      nickname?.trim() || null,
+      nickname ? String(nickname).trim() : null,
       gender || 'male',
       parseInt(age),
       hire_date,
       email.trim(),
-      address?.trim() || null,
+      address ? String(address).trim() : null,
       phone_number.trim(),
-      emer_phone?.trim() || null,
-      emer_name?.trim() || null,
-      position_id?.trim() || null,
-      parseInt(staff_id)
+      emer_phone ? String(emer_phone).trim() : null,
+      emer_name ? String(emer_name).trim() : null,
+      position_id ? String(position_id).trim() : null,
+      parseInt(id) // 使用 URL 參數中的 id
     ]);
 
-    console.log(`✅ 成功更新員工 ID ${staff_id}`);
+    console.log(`✅ 成功更新員工 ID ${id}`);
 
     res.json({
       success: true,
