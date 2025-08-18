@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, Trash2, UserPlus, Key, Shield, Lock, Unlock, X, Eye, EyeOff, User, Mail, Building, Calendar, CheckCircle, AlertCircle, Edit3, Save, Info } from 'lucide-react';
+import { Search, Users, Trash2, UserPlus, Key, Shield, Lock, Unlock, X, Eye, EyeOff, User, Mail, CheckCircle, AlertCircle, Edit3, Save, Info } from 'lucide-react';
 
 const UserAccountManagementSystem = () => {
   const [userList, setUserList] = useState([]);
@@ -67,10 +67,10 @@ const UserAccountManagementSystem = () => {
     setError('');
   };
 
-  // Load staff list for dropdown - fixed version
+  // Load staff list for dropdown
   const loadStaffList = async () => {
     try {
-      console.log('📄 Loading staff list...');
+      console.log('Loading staff list...');
       const response = await fetch(`${API_BASE_URL}/staff`);
       const data = await response.json();
       
@@ -89,15 +89,14 @@ const UserAccountManagementSystem = () => {
           availableStaff = data.data.filter(staff => 
             !existingStaffIds.includes(staff.staff_id)
           );
-          console.log(`✅ Excluded staff with existing accounts, ${availableStaff.length} available staff remaining`);
+          console.log(`Excluded staff with existing accounts, ${availableStaff.length} available staff remaining`);
         }
         
         setStaffList(availableStaff);
         setFilteredStaff(availableStaff);
         
-        // If no available staff, show notification
         if (availableStaff.length === 0) {
-          console.log('⚠️ No available staff to create accounts for');
+          console.log('No available staff to create accounts for');
         }
       } else {
         console.error('Failed to load staff list:', data.message);
@@ -111,13 +110,13 @@ const UserAccountManagementSystem = () => {
     }
   };
 
-  // Load all users and staff information - fixed version
+  // Load all users and staff information
   const loadAllUsers = async () => {
     setLoading(true);
     clearError();
     
     try {
-      console.log('📄 Loading all users...');
+      console.log('Loading all users...');
       const response = await fetch(`${API_BASE_URL}/users`);
       const data = await response.json();
       
@@ -127,7 +126,7 @@ const UserAccountManagementSystem = () => {
         setUserList(data.data);
         setResultTitle(`All User Accounts (Total: ${data.count} accounts)`);
         setCurrentView('table');
-        console.log(`✅ Successfully loaded ${data.count} users`);
+        console.log(`Successfully loaded ${data.count} users`);
       } else {
         showError(data.message || 'Failed to load user data');
       }
@@ -139,10 +138,10 @@ const UserAccountManagementSystem = () => {
     }
   };
 
-  // Search users and staff information - fixed version
+  // Enhanced search users with unified search logic
   const searchUsers = async (searchTerm) => {
     if (!searchTerm || !searchTerm.trim()) {
-      showError('Please enter search keywords');
+      loadAllUsers();
       return;
     }
 
@@ -203,15 +202,16 @@ const UserAccountManagementSystem = () => {
     loadAllUsers();
   };
 
-  // Handle search input
+  // Handle search input with Enter key support
   const handleSearch = (e) => {
     if (e.key === 'Enter') {
-      if (searchInput.trim()) {
-        searchUsers(searchInput);
-      } else {
-        loadAllUsers();
-      }
+      searchUsers(searchInput);
     }
+  };
+
+  // Real-time search as user types
+  const handleSearchChange = (value) => {
+    setSearchInput(value);
   };
 
   // Format date display
@@ -363,7 +363,7 @@ const UserAccountManagementSystem = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Handle adding new user - restructured version
+  // Handle adding new user
   const handleAddNewUser = async () => {
     if (!validateForm()) {
       return;
@@ -430,9 +430,9 @@ const UserAccountManagementSystem = () => {
     setShowConfirmPassword(false);
   };
 
-  // Handle staff search - fixed version
+  // Enhanced staff search with Staff ID support
   const handleStaffSearch = (searchTerm) => {
-    console.log('🔍 Searching staff:', searchTerm);
+    console.log('Searching staff:', searchTerm);
     setStaffSearchInput(searchTerm);
     
     if (searchTerm.trim()) {
@@ -451,7 +451,6 @@ const UserAccountManagementSystem = () => {
       setFilteredStaff(staffList);
     }
     
-    // Automatically show dropdown if there's search content
     if (searchTerm.trim() && !showStaffDropdown) {
       setShowStaffDropdown(true);
     }
@@ -487,7 +486,7 @@ const UserAccountManagementSystem = () => {
 
   // Open add user modal
   const openAddUserModal = () => {
-    console.log('🔧 Opening create user modal');
+    console.log('Opening create user modal');
     setShowAddUserModal(true);
     resetAddUserForm();
     loadStaffList(); // Load available staff list
@@ -515,7 +514,7 @@ const UserAccountManagementSystem = () => {
     }
   };
 
-  // Render edit field for specific columns
+  // Enhanced render edit field for specific columns
   const renderEditField = (user, field, type = 'text') => {
     const isEditing = editingUser === user.user_id;
     const value = editForm[field];
@@ -836,7 +835,7 @@ const UserAccountManagementSystem = () => {
                   placeholder={
                     staffList.length === 0 
                       ? "Loading staff..." 
-                      : "Search by name, ID, or email..."
+                      : "Search by name, staff ID, or email..."
                   }
                   className={`form-input ${formErrors.staff ? 'error' : ''}`}
                   disabled={staffList.length === 0}
@@ -1099,7 +1098,7 @@ const UserAccountManagementSystem = () => {
         </div>
       </div>
 
-      <div className="divider" style={{ margin: '3em'}} />
+      <div className="divider" />
 
       <div className="main-card">
         {/* Controls */}
@@ -1112,9 +1111,9 @@ const UserAccountManagementSystem = () => {
                 <input
                   type="text"
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   onKeyPress={handleSearch}
-                  placeholder="Search by user ID or name..."
+                  placeholder="Search by user ID, staff ID, or name..."
                   className="search-input"
                 />
               </div>
@@ -1127,16 +1126,18 @@ const UserAccountManagementSystem = () => {
               className="btn btn-primary"
             >
               <Users className="btn-icon" />
-              Refresh All Accounts
+              Refresh
             </button>
 
-            <button
-              onClick={clearResults}
-              className="btn btn-secondary"
-            >
-              <Trash2 className="btn-icon" />
-              Clear Search
-            </button>
+            {searchInput && (
+              <button
+                onClick={clearResults}
+                className="btn btn-secondary"
+              >
+                <Trash2 size={20} className="btn-icon" />
+                Clear Search
+              </button>
+            )}
 
             <button 
               className="btn btn-success"

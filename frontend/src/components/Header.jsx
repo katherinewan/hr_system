@@ -26,9 +26,6 @@ import {
   Smile, 
   ContactRound,
   Home,
-  Bell,
-  User,
-  Clock,
   History
 } from 'lucide-react';
 // logo

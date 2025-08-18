@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, BarChart3, AlertCircle, Loader, 
+  Search, BarChart3, AlertCircle, Loader, Trash2,
   Edit3, Save, X
 } from 'lucide-react';
 
@@ -154,16 +154,17 @@ const HRLeaveBalances = () => {
     loadLeaveBalances();
   }, []);
 
-  // Filter balances (only keep search functionality)
+  // Filter balances - Enhanced with Staff ID search
   const filteredBalances = leaveBalances.filter(balance => {
     const matchesSearch = searchInput === '' || 
-      balance.staff_name.toLowerCase().includes(searchInput.toLowerCase());
+      balance.staff_name.toLowerCase().includes(searchInput.toLowerCase()) ||
+      balance.staff_id.toString().toLowerCase().includes(searchInput.toLowerCase());
     return matchesSearch;
   });
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      {/* Control Area - only keep search and refresh */}
+      {/* Control Area */}
       <div className="controls">
         <div className="controls-wrapper">
           <div className="search-container">
@@ -172,7 +173,7 @@ const HRLeaveBalances = () => {
               <input
                 type="text"
                 className="search-input"
-                placeholder="Search employee name..."
+                placeholder="Search employee name or staff ID..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -193,6 +194,7 @@ const HRLeaveBalances = () => {
               className="btn btn-secondary"
               onClick={() => setSearchInput('')}
             >
+              <Trash2 size={20} className="btn-icon" />
               Clear Search
             </button>
           )}
@@ -233,7 +235,7 @@ const HRLeaveBalances = () => {
           <div className="empty-state">
             <BarChart3 size={64} />
             <h3>No Balance Records Found</h3>
-            <p>No employee leave balances match the filter criteria</p>
+            <p>No employee leave balances match the search criteria</p>
           </div>
         ) : (
           <div className="table-container">

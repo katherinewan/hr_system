@@ -137,15 +137,16 @@ const SalaryManagement = () => {
     fetchSalaries();
   }, []);
 
-  // Filter salaries based on search term and department
+  // Enhanced filter salaries with unified search logic
   useEffect(() => {
     let filtered = salaries;
 
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(salary =>
-        (salary.staff_name && salary.staff_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (salary.salary_id && salary.salary_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (salary.position_title && salary.position_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (salary.staff_name && salary.staff_name.toLowerCase().includes(searchLower)) ||
+        (salary.salary_id && salary.salary_id.toLowerCase().includes(searchLower)) ||
+        (salary.position_title && salary.position_title.toLowerCase().includes(searchLower)) ||
         (salary.staff_id && salary.staff_id.toString().includes(searchTerm))
       );
     }
@@ -158,6 +159,17 @@ const SalaryManagement = () => {
 
     setFilteredSalaries(filtered);
   }, [searchTerm, selectedDepartment, salaries]);
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm('');
+    setSelectedDepartment('all');
+  };
+
+  // Check if any search filters are active
+  const hasActiveSearch = () => {
+    return searchTerm || selectedDepartment !== 'all';
+  };
 
   // Create new salary
   const createSalary = async (salaryData) => {
@@ -385,7 +397,7 @@ const SalaryManagement = () => {
         <div className="empty-state">
           <h3>No salary records found</h3>
           <p>
-            {searchTerm || selectedDepartment !== 'all' ? 
+            {hasActiveSearch() ? 
              'No results match your search criteria.' : 
              'Start by adding salary information for your employees.'}
           </p>
@@ -573,7 +585,7 @@ const SalaryManagement = () => {
                 <Search className="search-icon" size={20} />
                 <input
                   type="text"
-                  placeholder="Search by name, ID, or position..."
+                  placeholder="Search by name, staff ID, salary ID, or position..."
                   className="search-input"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -608,6 +620,16 @@ const SalaryManagement = () => {
               <RefreshCw className="btn-icon" size={18} />
               Refresh
             </button>
+
+            {hasActiveSearch() && (
+              <button 
+                className="btn btn-secondary"
+                onClick={clearSearch}
+              >
+                <Trash2 className="btn-icon" size={18} />
+                Clear Search
+              </button>
+            )}
 
             {!showStats && (
               <button 

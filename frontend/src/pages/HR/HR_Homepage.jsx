@@ -20,6 +20,7 @@ import Position from './Position';
 import Department from './Department';
 import Salary from './Salary';
 import LeaveManagement from './LeaveManagement.jsx';
+import Payroll from './Payroll.jsx';
 
 // Layout Component
 const Layout = ({ children }) => (
@@ -407,19 +408,7 @@ export default function Homepage() {
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/salary" element={<Salary />} />
         <Route path="/leave-management/*" element={<LeaveManagement />} />
-        <Route path="/payroll" element={
-          <div style={{
-            padding: '3rem',
-            textAlign: 'center',
-            backgroundColor: 'white',
-            margin: '2rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}>
-            <h2 style={{ color: '#254e70', marginBottom: '1rem' }}>Payroll Management</h2>
-            <p style={{ color: '#6b7280' }}>Coming soon...</p>
-          </div>
-        } />
+        <Route path="/payroll" element={<Payroll />} />
         <Route path="/position" element={<Position />} />
         <Route path="/department" element={<Department />} />
         <Route path="/settings" element={

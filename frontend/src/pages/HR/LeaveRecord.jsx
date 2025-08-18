@@ -250,17 +250,18 @@ const HRLeaveRecords = () => {
     loadAllRequests();
   }, []);
 
-  // Filter records (only keep search functionality)
+  // Filter records - Enhanced with Staff ID search
   const filteredRecords = allRequests.filter(request => {
     const matchesSearch = searchInput === '' || 
       request.staff_name.toLowerCase().includes(searchInput.toLowerCase()) ||
+      request.staff_id.toString().toLowerCase().includes(searchInput.toLowerCase()) ||
       request.leave_type.toLowerCase().includes(searchInput.toLowerCase());
     return matchesSearch;
   });
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      {/* Control Area - only keep search and refresh */}
+      {/* Control Area */}
       <div className="controls">
         <div className="controls-wrapper">
           <div className="search-container">
@@ -269,7 +270,7 @@ const HRLeaveRecords = () => {
               <input
                 type="text"
                 className="search-input"
-                placeholder="Search employee name or leave type..."
+                placeholder="Search employee name, staff ID, or leave type..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -290,6 +291,7 @@ const HRLeaveRecords = () => {
               className="btn btn-secondary"
               onClick={() => setSearchInput('')}
             >
+              <Trash2 size={20} className="btn-icon" />
               Clear Search
             </button>
           )}

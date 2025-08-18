@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Building, Trash2, Plus, Edit3, Save, X, Users, BarChart3 } from 'lucide-react';
+import { Search, Building, Trash2, Plus, Edit3, Save, X } from 'lucide-react';
 
 const DepartmentManagementSystem = () => {
   const [departmentList, setDepartmentList] = useState([]);
@@ -13,7 +13,7 @@ const DepartmentManagementSystem = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // 新增部門相關狀態
+  // Add department related state
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({
     department_id: '',
@@ -79,10 +79,10 @@ const DepartmentManagementSystem = () => {
     }
   };
 
-  // Search departments
+  // Enhanced search departments with unified search logic
   const searchDepartments = async (searchTerm) => {
     if (!searchTerm || !searchTerm.trim()) {
-      showError('Please enter search keywords');
+      loadAllDepartments();
       return;
     }
 
@@ -98,10 +98,11 @@ const DepartmentManagementSystem = () => {
         response = await fetch(`${API_BASE_URL}/departments/${trimmedInput}`);
       } else {
         console.log(`Searching department name: ${trimmedInput}`);
-        // 在部門列表中本地搜索
+        // Enhanced local search with department ID, name, and head
         const filteredDepartments = departmentList.filter(dept => 
           dept.department_name.toLowerCase().includes(trimmedInput.toLowerCase()) ||
-          dept.department_head.toLowerCase().includes(trimmedInput.toLowerCase())
+          dept.department_head.toLowerCase().includes(trimmedInput.toLowerCase()) ||
+          dept.department_id.toString().includes(trimmedInput)
         );
         
         setDepartmentList(filteredDepartments);
@@ -150,15 +151,16 @@ const DepartmentManagementSystem = () => {
     loadAllDepartments();
   };
 
-  // Handle search input
+  // Handle search input with Enter key support
   const handleSearch = (e) => {
     if (e.key === 'Enter') {
-      if (searchInput.trim()) {
-        searchDepartments(searchInput);
-      } else {
-        loadAllDepartments();
-      }
+      searchDepartments(searchInput);
     }
+  };
+
+  // Real-time search as user types
+  const handleSearchChange = (value) => {
+    setSearchInput(value);
   };
 
   // Start editing a department
@@ -659,9 +661,9 @@ const DepartmentManagementSystem = () => {
                 <input
                   type="text"
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   onKeyPress={handleSearch}
-                  placeholder="Search department name or department ID..."
+                  placeholder="Search by department ID, name, or head..."
                   className="search-input"
                 />
               </div>
@@ -674,23 +676,25 @@ const DepartmentManagementSystem = () => {
               className="btn btn-primary"
             >
               <Building className="btn-icon" />
-              Refresh All Departments
+              Refresh
             </button>
 
-            <button
-              onClick={clearResults}
-              className="btn btn-secondary"
-            >
-              <Trash2 className="btn-icon" />
-              Clear Search
-            </button>
+            {searchInput && (
+              <button
+                onClick={clearResults}
+                className="btn btn-secondary"
+              >
+                <Trash2 size={20} className="btn-icon" />
+                Clear Search
+              </button>
+            )}
 
             <button 
               onClick={openAddModal}
               className="btn btn-success"
             >
               <Plus className="btn-icon" />
-              Add New Department
+              Add Department
             </button>
           </div>
         </div>

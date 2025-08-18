@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, Eye, CheckCircle, XCircle, User, Mail, Phone, Building, 
-  AlertCircle, Loader, FileText, History, Clock
+  Search, Eye, CheckCircle, XCircle, User, Mail, Phone, Building, Trash2, 
+  AlertCircle, Loader, FileText, History
 } from 'lucide-react';
 
 const HRLeaveRequests = () => {
@@ -73,47 +73,13 @@ const HRLeaveRequests = () => {
   const loadPendingRequests = async () => {
     try {
       setLoading(true);
-      setError(''); // Clear previous errors
+      setError('');
       
-      console.log('🔍 API_BASE_URL:', API_BASE_URL);
-      console.log('🔍 Full URL:', `${API_BASE_URL}/holidays/requests/pending`);
-      
-      // First test if server is running
-      try {
-        const healthCheck = await fetch(`${getApiUrl()}/health`);
-        console.log('🏥 Health check status:', healthCheck.status);
-        if (healthCheck.ok) {
-          const healthData = await healthCheck.json();
-          console.log('🏥 Server status:', healthData);
-        }
-      } catch (healthError) {
-        console.warn('⚠️ Health check failed:', healthError.message);
-        showError('Unable to connect to server, please check if backend service is running');
-        return;
-      }
-      
-      // Test if holiday routes are available
-      try {
-        const testResponse = await fetch(`${API_BASE_URL}/holidays/test`);
-        console.log('🧪 Holiday route test status:', testResponse.status);
-        if (testResponse.ok) {
-          const testData = await testResponse.json();
-          console.log('🧪 Holiday routes available:', testData);
-        }
-      } catch (testError) {
-        console.warn('⚠️ Holiday route test failed:', testError.message);
-      }
-      
-      // Now try to get pending requests
-      console.log('📡 Fetching pending requests...');
       const response = await fetch(`${API_BASE_URL}/holidays/requests/pending`);
-      
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response OK:', response.ok);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ HTTP Error Details:', {
+        console.error('HTTP Error Details:', {
           status: response.status,
           statusText: response.statusText,
           body: errorText
@@ -130,7 +96,6 @@ const HRLeaveRequests = () => {
       }
       
       const data = await response.json();
-      console.log('📦 Response data:', data);
       
       if (data.success) {
         setPendingRequests(data.data || []);
@@ -140,18 +105,10 @@ const HRLeaveRequests = () => {
       }
       
     } catch (error) {
-      console.error('❌ Complete error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
+      console.error('Complete error details:', error);
       
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        showError('Network connection failed. Please confirm:\n1. Backend server is running on localhost:3001\n2. Network connection is normal');
-      } else if (error.message.includes('404')) {
-        showError('API endpoint does not exist, please check backend route configuration');
-      } else if (error.message.includes('CORS')) {
-        showError('Cross-origin request blocked, please check CORS settings');
+        showError('Network connection failed. Please confirm backend server is running.');
       } else {
         showError(`Loading failed: ${error.message}`);
       }
@@ -172,7 +129,7 @@ const HRLeaveRequests = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          approver_id: 100002, // Should get from current user
+          approver_id: 100002,
           comments: comments || undefined
         })
       });
@@ -425,10 +382,11 @@ const HRLeaveRequests = () => {
     loadPendingRequests();
   }, []);
 
-  // Filter requests
+  // Filter requests - Enhanced with Staff ID search
   const filteredRequests = pendingRequests.filter(request => {
     const matchesSearch = searchInput === '' || 
       request.staff_name.toLowerCase().includes(searchInput.toLowerCase()) ||
+      request.staff_id.toString().toLowerCase().includes(searchInput.toLowerCase()) ||
       request.leave_type.toLowerCase().includes(searchInput.toLowerCase());
     return matchesSearch;
   });
@@ -444,7 +402,7 @@ const HRLeaveRequests = () => {
               <input
                 type="text"
                 className="search-input"
-                placeholder="Search employee name or leave type..."
+                placeholder="Search employee name, staff ID, or leave type..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -458,6 +416,16 @@ const HRLeaveRequests = () => {
             <History size={20} className="btn-icon" />
             Refresh
           </button>
+
+          {searchInput && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setSearchInput('')}
+            >
+              <Trash2 size={20} className="btn-icon" />
+              Clear Search
+            </button>
+          )}
         </div>
       </div>
 

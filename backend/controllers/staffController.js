@@ -158,6 +158,7 @@ const searchStaffByName = async (req, res) => {
 const createStaff = async (req, res) => {
   try {
     const {
+      staff_id,
       name,
       nickname,
       gender,
@@ -209,25 +210,26 @@ const createStaff = async (req, res) => {
 
     // 插入新員工到資料庫
     const result = await pool.query(`
-      INSERT INTO staff (
-        name, nickname, gender, age, hire_date, email, address, 
-        phone_number, emer_phone, emer_name, position_id
-      ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING *
-    `, [
-      name.trim(),
-      nickname?.trim() || null,
-      gender || 'male',
-      parseInt(age),
-      hire_date,
-      email.trim(),
-      address?.trim() || null,
-      phone_number.trim(),
-      emer_phone?.trim() || null,
-      emer_name?.trim() || null,
-      position_id?.trim() || null
-    ]);
+    INSERT INTO staff (
+      staff_id, name, nickname, gender, age, hire_date, email, address, 
+      phone_number, emer_phone, emer_name, position_id
+    ) 
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    RETURNING *
+  `, [
+    staff_id.trim(),
+    name.trim(),
+    nickname?.trim() || null,
+    gender || 'male',
+    parseInt(age),
+    hire_date,
+    email.trim(),
+    address?.trim() || null,
+    phone_number.trim(),
+    emer_phone?.trim() || null,
+    emer_name?.trim() || null,
+    position_id?.trim() || null
+  ]);
 
     console.log(`✅ 成功新增員工 ID ${result.rows[0].staff_id}`);
 

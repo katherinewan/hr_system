@@ -99,6 +99,10 @@ const AttendanceManagementSystem = () => {
       status: '',
       date: ''
     });
+    // Reload all data after clearing
+    setTimeout(() => {
+      loadAllAttendance();
+    }, 100);
   };
 
   // Handle clock in/out
@@ -232,6 +236,12 @@ const AttendanceManagementSystem = () => {
     }
   };
 
+  // Check if any search filters are active
+  const hasActiveSearch = () => {
+    return searchParams.staff_id || searchParams.start_date || 
+           searchParams.end_date || searchParams.status || searchParams.date;
+  };
+
   // Load all records when component mounts
   useEffect(() => {
     loadAllAttendance();
@@ -351,7 +361,7 @@ const AttendanceManagementSystem = () => {
                     type="text"
                     value={searchParams.staff_id}
                     onChange={(e) => setSearchParams({...searchParams, staff_id: e.target.value})}
-                    placeholder="Enter Employee ID to search..."
+                    placeholder="Search by employee ID or name..."
                     className="search-input"
                   />
                 </div>
@@ -411,21 +421,22 @@ const AttendanceManagementSystem = () => {
               </button>
 
               <button
-                onClick={clearSearch}
-                className="btn btn-secondary"
-              >
-                <Trash2 className="btn-icon" />
-                Clear
-              </button>
-
-              <button
                 onClick={loadAllAttendance}
                 disabled={loading}
                 className="btn btn-primary"
               >
                 <Users className="btn-icon" />
-                Load All
+                Refresh
               </button>
+
+              {hasActiveSearch() && (
+                <button
+                  onClick={clearSearch}
+                  className="btn btn-secondary"
+                >
+                  Clear Search
+                </button>
+              )}
 
               <button 
                 onClick={() => setShowClockModal(true)}
