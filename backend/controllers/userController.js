@@ -161,7 +161,7 @@ const createUser = async (req, res) => {
     console.log('➕ Request: Create new user');
     console.log('📋 Request parameters:', { staff_id, role, password_length: password?.length });
 
-    // Validate required parameters
+    // 參數驗證
     if (!staff_id || !password) {
       console.log('❌ Parameter validation failed:', { staff_id: !!staff_id, password: !!password });
       return res.status(400).json({
@@ -170,7 +170,25 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Validate password strength
+    // 🔥 重要：確保 staff_id 是整數（因為資料庫中是 integer 類型）
+    let staffIdInt;
+    if (typeof staff_id === 'number') {
+      staffIdInt = staff_id;
+    } else {
+      staffIdInt = parseInt(staff_id, 10);
+    }
+    
+    if (isNaN(staffIdInt)) {
+      console.log('❌ Invalid staff_id format:', staff_id);
+      return res.status(400).json({
+        success: false,
+        message: 'Staff ID must be a valid number'
+      });
+    }
+
+    console.log('✅ Staff ID converted to integer:', staffIdInt);
+
+    // 密碼強度驗證
     if (password.length < 6) {
       console.log('❌ Password too short:', password.length);
       return res.status(400).json({
@@ -179,28 +197,37 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Check if staff exists in staff table
+    // 檢查 bcrypt 是否可用
+    if (!bcrypt) {
+      console.error('❌ bcrypt not available');
+      return res.status(500).json({
+        success: false,
+        message: 'Password encryption service unavailable. Please ensure bcrypt is installed.'
+      });
+    }
+
+    // 檢查員工是否存在（使用整數類型的 staff_id）
     console.log('🔍 Checking if staff exists...');
     const staffExists = await pool.query(
       'SELECT staff_id, name FROM staff WHERE staff_id = $1',
-      [staff_id]
+      [staffIdInt]
     );
     
     if (staffExists.rows.length === 0) {
-      console.log('❌ Staff does not exist:', staff_id);
+      console.log('❌ Staff does not exist:', staffIdInt);
       return res.status(400).json({
         success: false,
-        message: `Staff ID ${staff_id} does not exist in the system`
+        message: `Staff ID ${staffIdInt} does not exist in the system`
       });
     }
     
     console.log('✅ Staff exists:', staffExists.rows[0]);
 
-    // Check if user account already exists for this staff
+    // 檢查用戶帳號是否已存在（使用整數類型的 staff_id）
     console.log('🔍 Checking if user account already exists...');
     const existingUser = await pool.query(
       'SELECT user_id FROM user_accounts WHERE staff_id = $1',
-      [staff_id] 
+      [staffIdInt] 
     );
 
     if (existingUser.rows.length > 0) {
@@ -213,26 +240,32 @@ const createUser = async (req, res) => {
 
     console.log('✅ Can create new user account');
 
-    // Hash password
+    // 🆕 獲取下一個可用的 user_id
+    console.log('🔍 Getting next available user_id...');
+    const nextIdResult = await pool.query('SELECT COALESCE(MAX(user_id), 0) + 1 AS next_id FROM user_accounts');
+    const nextUserId = nextIdResult.rows[0].next_id;
+    console.log('✅ Next user_id will be:', nextUserId);
+
+    // 哈希密碼
     console.log('🔐 Starting password hashing...');
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     console.log('✅ Password hashing completed');
 
-    // Create user account
+    // 創建用戶帳號（明確指定 user_id）
     console.log('💾 Inserting user data into database...');
     const insertQuery = `
-      INSERT INTO user_accounts (staff_id, password, role, failed_login_attempts, account_locked)
-      VALUES ($1, $2, $3, 0, false)
+      INSERT INTO user_accounts (user_id, staff_id, password, role, failed_login_attempts, account_locked)
+      VALUES ($1, $2, $3, $4, 0, false)
       RETURNING user_id, staff_id, role, failed_login_attempts, account_locked
     `;
     
-    console.log('📝 Executing SQL:', insertQuery);
-    console.log('📝 Parameters:', [staff_id, '[password encrypted]', role]);
+    console.log('🔍 Executing SQL:', insertQuery);
+    console.log('🔍 Parameters:', [nextUserId, staffIdInt, '[password encrypted]', role]);
     
-    const result = await pool.query(insertQuery, [staff_id, hashedPassword, role]);
+    const result = await pool.query(insertQuery, [nextUserId, staffIdInt, hashedPassword, role]);
 
-    console.log(`✅ Successfully created user account, User ID: ${result.rows[0].user_id}, Staff ID: ${staff_id}`);
+    console.log(`✅ Successfully created user account, User ID: ${result.rows[0].user_id}, Staff ID: ${staffIdInt}`);
 
     const newUser = result.rows[0];
 
@@ -255,7 +288,7 @@ const createUser = async (req, res) => {
     console.error('Error details:', error.detail);
     console.error('Error stack:', error.stack);
     
-    // Provide specific error messages based on error type
+    // 提供具體錯誤訊息
     let errorMessage = 'Failed to create user account';
     
     if (error.code === '23505') {
@@ -266,6 +299,10 @@ const createUser = async (req, res) => {
       errorMessage = 'user_accounts table does not exist';
     } else if (error.code === '42703') {
       errorMessage = 'Table field does not exist';
+    } else if (error.code === '23502') {
+      errorMessage = 'Required field is missing (not-null constraint violation)';
+    } else if (error.message.includes('bcrypt')) {
+      errorMessage = 'Password encryption failed - please ensure bcrypt is installed';
     }
     
     res.status(500).json({

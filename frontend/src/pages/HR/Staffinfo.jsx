@@ -631,7 +631,7 @@ const EmployeeManagementSystem = () => {
             <form onSubmit={(e) => e.preventDefault()}>
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
                 <div className="form-group">
-                  <label htmlFor='add-id'>Staff ID</label>
+                  <label htmlFor='add-id'>Staff ID <span className="required">*</span></label>
                   <input id='add-id' 
                   type='number'  
                   value={addForm.staff_id}
