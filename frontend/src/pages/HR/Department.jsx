@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Building, Trash2, Plus, Edit3, Save, X } from 'lucide-react';
+import { Search, History, Trash2, Plus, Edit3, Save, X, Loader, FileText } from 'lucide-react';
 
 const DepartmentManagementSystem = () => {
   const [departmentList, setDepartmentList] = useState([]);
@@ -77,90 +77,6 @@ const DepartmentManagementSystem = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Enhanced search departments with unified search logic
-  const searchDepartments = async (searchTerm) => {
-    if (!searchTerm || !searchTerm.trim()) {
-      loadAllDepartments();
-      return;
-    }
-
-    const trimmedInput = searchTerm.trim();
-    setLoading(true);
-    clearError();
-    
-    try {
-      let response;
-      
-      if (/^\d+$/.test(trimmedInput)) {
-        console.log(`Searching department ID: ${trimmedInput}`);
-        response = await fetch(`${API_BASE_URL}/departments/${trimmedInput}`);
-      } else {
-        console.log(`Searching department name: ${trimmedInput}`);
-        // Enhanced local search with department ID, name, and head
-        const filteredDepartments = departmentList.filter(dept => 
-          dept.department_name.toLowerCase().includes(trimmedInput.toLowerCase()) ||
-          dept.department_head.toLowerCase().includes(trimmedInput.toLowerCase()) ||
-          dept.department_id.toString().includes(trimmedInput)
-        );
-        
-        setDepartmentList(filteredDepartments);
-        setResultTitle(`Search Results for "${trimmedInput}" (Total: ${filteredDepartments.length} departments)`);
-        setCurrentView('table');
-        setLoading(false);
-        return;
-      }
-      
-      const data = await response.json();
-      console.log('Backend response:', data);
-      
-      if (response.ok && data) {
-        if (data.success) {
-          let deptData;
-          if (Array.isArray(data.data)) {
-            deptData = data.data;
-          } else {
-            deptData = [data.data];
-          }
-          
-          setDepartmentList(deptData);
-          setResultTitle(`Search Results for "${trimmedInput}" (Total: ${deptData.length} departments)`);
-          setCurrentView('table');
-        } else {
-          showError(data.message || 'Department data not found');
-        }
-      } else {
-        if (response.status === 404) {
-          showError(`Department "${trimmedInput}" not found`);
-        } else {
-          showError(data.message || 'Error occurred during search');
-        }
-      }
-    } catch (error) {
-      showError('Error occurred during search, please check network connection');
-      console.error('Search error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Clear results
-  const clearResults = () => {
-    setSearchInput('');
-    loadAllDepartments();
-  };
-
-  // Handle search input with Enter key support
-  const handleSearch = (e) => {
-    if (e.key === 'Enter') {
-      searchDepartments(searchInput);
-    }
-  };
-
-  // Real-time search as user types
-  const handleSearchChange = (value) => {
-    setSearchInput(value);
   };
 
   // Start editing a department
@@ -516,18 +432,32 @@ const DepartmentManagementSystem = () => {
 
   // Render department table
   const renderDepartmentTable = () => {
-    if (departmentList.length === 0) {
+    // Filter departments based on search input - this is the key fix!
+    const filteredDepartments = departmentList.filter(department => {
+      const matchesSearch = searchInput === '' || 
+        department.department_name.toLowerCase().includes(searchInput.toLowerCase()) ||
+        department.department_id.toString().includes(searchInput);
+      return matchesSearch;
+    });
+
+    if (filteredDepartments.length === 0) {
       return (
         <div className="empty-state">
+          <FileText size={64} />
           <h3>No department data found</h3>
-          <p>Please try other search criteria</p>
+          <p>{searchInput ? `No departments match "${searchInput}"` : 'Please try other search criteria'}</p>
         </div>
       );
     }
 
     return (
       <div>
-        <h2 className="result-title">{resultTitle}</h2>
+        <h2 className="result-title">
+          {searchInput ? 
+            `Search Results for "${searchInput}" (${filteredDepartments.length} departments)` : 
+            `All Departments (Total: ${filteredDepartments.length} departments)`
+          }
+        </h2>
         <div className="table-container">
           <table className="staff-table">
             <thead>
@@ -540,7 +470,7 @@ const DepartmentManagementSystem = () => {
               </tr>
             </thead>
             <tbody>
-              {departmentList.map((department) => (
+              {filteredDepartments.map((department) => (
                 <tr key={department.department_id} className={`table-row ${editingDepartment === department.department_id ? 'editing' : ''}`}>
                   <td>
                     <strong className="staff-id">{department.department_id}</strong>
@@ -616,6 +546,7 @@ const DepartmentManagementSystem = () => {
     if (loading) {
       return (
         <div className="loading-state">
+          <Loader size={48} className="animate-spin" />
           <div>Loading department data...</div>
         </div>
       );
@@ -660,11 +591,10 @@ const DepartmentManagementSystem = () => {
                 <Search className="search-icon" />
                 <input
                   type="text"
-                  value={searchInput}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  onKeyPress={handleSearch}
-                  placeholder="Search by department ID, name, or head..."
                   className="search-input"
+                  placeholder="Search department name or department ID..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                 />
               </div>
             </div>
@@ -675,14 +605,14 @@ const DepartmentManagementSystem = () => {
               disabled={loading}
               className="btn btn-primary"
             >
-              <Building className="btn-icon" />
+              <History size={20} className="btn-icon" />
               Refresh
             </button>
 
             {searchInput && (
               <button
-                onClick={clearResults}
                 className="btn btn-secondary"
+                onClick={() => setSearchInput('')}
               >
                 <Trash2 size={20} className="btn-icon" />
                 Clear Search

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, History, Eye, AlertCircle, Loader, 
-  Calendar, FileText, User, Building
+  Trash2, FileText, User, Building
 } from 'lucide-react';
 
 const HRLeaveRecords = () => {

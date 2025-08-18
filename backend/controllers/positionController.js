@@ -170,7 +170,7 @@ const createPosition = async (req, res) => {
     
     // 檢查同部門是否已有相同職位名稱
     const duplicateCheck = await query(
-      'SELECT position_id FROM positions WHERE title = $1 AND department_id = $2',
+      'SELECT position_id FROM position WHERE title = $1 AND department_id = $2',
       [title, department_id]
     );
     

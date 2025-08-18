@@ -70,6 +70,7 @@ const HRLeaveRequests = () => {
     return labels[status] || status;
   };
 
+  // Loading all requests
   const loadPendingRequests = async () => {
     try {
       setLoading(true);
