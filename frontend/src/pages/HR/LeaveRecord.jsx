@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, History, Filter, Eye, AlertCircle, Loader, 
+  Search, History, Eye, AlertCircle, Loader, 
   Calendar, FileText, User, Building
 } from 'lucide-react';
 
@@ -9,25 +9,30 @@ const HRLeaveRecords = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // API base URL
-  const API_BASE_URL = 'http://localhost:3001/api';
+  // API
+  const getApiUrl = () => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return 'http://localhost:3001';
+    }
+    return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  };
 
-  // 通用函數
+  const API_BASE_URL = `${getApiUrl()}/api`;
+
+  // Utility functions
   const showError = (message) => {
     setError(message);
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('zh-TW');
+    return new Date(dateString).toLocaleDateString('en-US');
   };
 
   const formatDateTime = (dateString) => {
-    return new Date(dateString).toLocaleString('zh-TW');
+    return new Date(dateString).toLocaleString('en-US');
   };
 
   const getStatusBadgeClass = (status) => {
@@ -42,50 +47,46 @@ const HRLeaveRecords = () => {
 
   const getLeaveTypeLabel = (type) => {
     const labels = {
-      'sick_leave': '病假',
-      'annual_leave': '年假',
-      'casual_leave': '事假',
-      'maternity_leave': '產假',
-      'paternity_leave': '陪產假'
+      'sick_leave': 'Sick Leave',
+      'annual_leave': 'Annual Leave',
+      'casual_leave': 'Casual Leave',
+      'maternity_leave': 'Maternity Leave',
+      'paternity_leave': 'Paternity Leave'
     };
     return labels[type] || type;
   };
 
   const getStatusLabel = (status) => {
     const labels = {
-      'Pending': '待審核',
-      'Approved': '已批准',
-      'Rejected': '已拒絕',
-      'Cancelled': '已取消'
+      'Pending': 'Pending',
+      'Approved': 'Approved',
+      'Rejected': 'Rejected',
+      'Cancelled': 'Cancelled'
     };
     return labels[status] || status;
   };
 
-  // 載入所有申請記錄
+  // Load all request records
   const loadAllRequests = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (statusFilter) params.append('status', statusFilter);
-      if (typeFilter) params.append('leave_type', typeFilter);
-      
-      const response = await fetch(`${API_BASE_URL}/holidays/requests?${params.toString()}`);
+      const response = await fetch(`${API_BASE_URL}/holidays/requests`);
       const data = await response.json();
       
       if (data.success) {
         setAllRequests(data.data || []);
       } else {
-        showError(data.message || '無法載入申請記錄');
+        showError(data.message || 'Unable to load request records');
       }
     } catch (error) {
-      showError('載入記錄失敗，請檢查網路連接');
+      showError('Failed to load records, please check network connection');
       console.error('Error loading all requests:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 渲染申請詳情彈窗
+  // Render request detail modal
   const renderRequestDetailModal = () => {
     if (!showDetailModal || !selectedRequest) return null;
 
@@ -97,9 +98,9 @@ const HRLeaveRecords = () => {
               <div className="modal-title-section">
                 <h3 className="modal-title-with-icon">
                   <FileText size={24} />
-                  申請記錄詳情
+                  Request Record Details
                 </h3>
-                <p>申請編號: {selectedRequest.request_id}</p>
+                <p>Request ID: {selectedRequest.request_id}</p>
               </div>
               <button 
                 className="close-btn" 
@@ -111,11 +112,11 @@ const HRLeaveRecords = () => {
           </div>
 
           <div className="modal-body">
-            {/* 員工資訊 */}
+            {/* Employee Information */}
             <div className="selected-staff-preview">
               <h4 className="preview-title">
                 <User size={16} />
-                員工資訊
+                Employee Information
               </h4>
               <div className="selected-staff-content">
                 <div className="selected-staff-avatar">
@@ -124,10 +125,10 @@ const HRLeaveRecords = () => {
                 <div className="selected-staff-info">
                   <div className="selected-staff-name">{selectedRequest.staff_name}</div>
                   <div className="selected-staff-detail">
-                    <Building size={12} /> {selectedRequest.department_name || '未分配部門'}
+                    <Building size={12} /> {selectedRequest.department_name || 'Unassigned Department'}
                   </div>
                   <div className="selected-staff-detail">
-                    <User size={12} /> {selectedRequest.position_title || '未分配職位'}
+                    <User size={12} /> {selectedRequest.position_title || 'Unassigned Position'}
                   </div>
                   <div className="selected-staff-detail">
                     ID: {selectedRequest.staff_id}
@@ -136,10 +137,10 @@ const HRLeaveRecords = () => {
               </div>
             </div>
 
-            {/* 假期申請詳情 */}
+            {/* Leave Request Details */}
             <div className="salary-form-grid">
               <div className="form-group">
-                <label>假期類型</label>
+                <label>Leave Type</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   <span className="position-badge">
                     {getLeaveTypeLabel(selectedRequest.leave_type)}
@@ -148,7 +149,7 @@ const HRLeaveRecords = () => {
               </div>
 
               <div className="form-group">
-                <label>申請狀態</label>
+                <label>Request Status</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   <span className={getStatusBadgeClass(selectedRequest.status)}>
                     {getStatusLabel(selectedRequest.status)}
@@ -157,28 +158,28 @@ const HRLeaveRecords = () => {
               </div>
 
               <div className="form-group">
-                <label>開始日期</label>
+                <label>Start Date</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   {formatDate(selectedRequest.start_date)}
                 </div>
               </div>
 
               <div className="form-group">
-                <label>結束日期</label>
+                <label>End Date</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   {formatDate(selectedRequest.end_date)}
                 </div>
               </div>
 
               <div className="form-group">
-                <label>請假天數</label>
+                <label>Leave Days</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  <strong>{selectedRequest.total_days} 天</strong>
+                  <strong>{selectedRequest.total_days} days</strong>
                 </div>
               </div>
 
               <div className="form-group">
-                <label>申請日期</label>
+                <label>Application Date</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   {formatDateTime(selectedRequest.applied_on)}
                 </div>
@@ -186,7 +187,7 @@ const HRLeaveRecords = () => {
             </div>
 
             <div className="form-group">
-              <label>請假原因</label>
+              <label>Leave Reason</label>
               <div className="form-input" style={{ background: '#f8f9fa', minHeight: '80px' }}>
                 {selectedRequest.reason}
               </div>
@@ -194,17 +195,17 @@ const HRLeaveRecords = () => {
 
             {selectedRequest.emergency_contact && (
               <div className="form-group">
-                <label>緊急聯絡電話</label>
+                <label>Emergency Contact</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   {selectedRequest.emergency_contact}
                 </div>
               </div>
             )}
 
-            {/* 審核資訊 */}
+            {/* Review Information */}
             {(selectedRequest.approved_by_name || selectedRequest.approved_on) && (
               <div style={{ marginTop: '1.5rem' }}>
-                <h4 style={{ marginBottom: '0.5rem', color: '#2e382e' }}>審核資訊</h4>
+                <h4 style={{ marginBottom: '0.5rem', color: '#2e382e' }}>Review Information</h4>
                 <div style={{
                   padding: '1rem',
                   backgroundColor: selectedRequest.status === 'Approved' ? '#ecfdf5' : '#fef2f2',
@@ -213,17 +214,17 @@ const HRLeaveRecords = () => {
                 }}>
                   {selectedRequest.approved_by_name && (
                     <div style={{ marginBottom: '0.5rem' }}>
-                      <strong>審核人員:</strong> {selectedRequest.approved_by_name}
+                      <strong>Reviewer:</strong> {selectedRequest.approved_by_name}
                     </div>
                   )}
                   {selectedRequest.approved_on && (
                     <div style={{ marginBottom: '0.5rem' }}>
-                      <strong>審核日期:</strong> {formatDateTime(selectedRequest.approved_on)}
+                      <strong>Review Date:</strong> {formatDateTime(selectedRequest.approved_on)}
                     </div>
                   )}
                   {selectedRequest.rejection_reason && (
                     <div>
-                      <strong>備註:</strong> {selectedRequest.rejection_reason}
+                      <strong>Comments:</strong> {selectedRequest.rejection_reason}
                     </div>
                   )}
                 </div>
@@ -236,7 +237,7 @@ const HRLeaveRecords = () => {
               className="btn btn-secondary"
               onClick={() => setShowDetailModal(false)}
             >
-              關閉
+              Close
             </button>
           </div>
         </div>
@@ -244,12 +245,12 @@ const HRLeaveRecords = () => {
     );
   };
 
-  // 載入數據
+  // Load data
   useEffect(() => {
     loadAllRequests();
-  }, [statusFilter, typeFilter]);
+  }, []);
 
-  // 篩選記錄
+  // Filter records (only keep search functionality)
   const filteredRecords = allRequests.filter(request => {
     const matchesSearch = searchInput === '' || 
       request.staff_name.toLowerCase().includes(searchInput.toLowerCase()) ||
@@ -259,7 +260,7 @@ const HRLeaveRecords = () => {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      {/* 控制區域 */}
+      {/* Control Area - only keep search and refresh */}
       <div className="controls">
         <div className="controls-wrapper">
           <div className="search-container">
@@ -268,39 +269,12 @@ const HRLeaveRecords = () => {
               <input
                 type="text"
                 className="search-input"
-                placeholder="搜尋員工姓名或假期類型..."
+                placeholder="Search employee name or leave type..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
           </div>
-          
-          <select
-            className="search-input"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ minWidth: '140px' }}
-          >
-            <option value="">所有狀態</option>
-            <option value="pending">待審核</option>
-            <option value="approved">已批准</option>
-            <option value="rejected">已拒絕</option>
-            <option value="cancelled">已取消</option>
-          </select>
-
-          <select
-            className="search-input"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            style={{ minWidth: '140px' }}
-          >
-            <option value="">所有類型</option>
-            <option value="sick_leave">病假</option>
-            <option value="annual_leave">年假</option>
-            <option value="casual_leave">事假</option>
-            <option value="maternity_leave">產假</option>
-            <option value="paternity_leave">陪產假</option>
-          </select>
 
           <button
             className="btn btn-primary"
@@ -308,24 +282,21 @@ const HRLeaveRecords = () => {
             disabled={loading}
           >
             <History size={20} className="btn-icon" />
-            重新整理
+            Refresh
           </button>
 
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setSearchInput('');
-              setStatusFilter('');
-              setTypeFilter('');
-            }}
-          >
-            <Filter size={20} className="btn-icon" />
-            清除篩選
-          </button>
+          {searchInput && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setSearchInput('')}
+            >
+              Clear Search
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 錯誤訊息 */}
+      {/* Error Messages */}
       {error && (
         <div className="error-message" style={{ margin: '0', borderRadius: '0' }}>
           <AlertCircle size={16} />
@@ -333,37 +304,37 @@ const HRLeaveRecords = () => {
         </div>
       )}
 
-      {/* 內容 */}
+      {/* Content */}
       <div className="content">
         <h2 className="result-title">
-          申請記錄 ({filteredRecords.length})
+          Request Records ({filteredRecords.length})
         </h2>
 
         {loading ? (
           <div className="loading-state">
             <Loader size={48} className="animate-spin" />
-            <div>載入記錄資料中...</div>
+            <div>Loading record data...</div>
           </div>
         ) : filteredRecords.length === 0 ? (
           <div className="empty-state">
             <History size={64} />
-            <h3>沒有找到申請記錄</h3>
-            <p>沒有符合篩選條件的申請記錄</p>
+            <h3>No Request Records Found</h3>
+            <p>No request records match the search criteria</p>
           </div>
         ) : (
           <div className="table-container">
             <table className="staff-table">
               <thead className="table-header">
                 <tr>
-                  <th>申請編號</th>
-                  <th>員工資訊</th>
-                  <th>假期類型</th>
-                  <th>日期範圍</th>
-                  <th>天數</th>
-                  <th>狀態</th>
-                  <th>申請日期</th>
-                  <th>審核人</th>
-                  <th>操作</th>
+                  <th>Request ID</th>
+                  <th>Employee Info</th>
+                  <th>Leave Type</th>
+                  <th>Date Range</th>
+                  <th>Days</th>
+                  <th>Status</th>
+                  <th>Applied Date</th>
+                  <th>Reviewer</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -377,7 +348,7 @@ const HRLeaveRecords = () => {
                         <div className="employee-name">{request.staff_name}</div>
                         <div className="employee-id">ID: {request.staff_id}</div>
                         <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                          {request.department_name || '未分配部門'}
+                          {request.department_name || 'Unassigned Department'}
                         </div>
                       </div>
                     </td>
@@ -390,12 +361,12 @@ const HRLeaveRecords = () => {
                       <div style={{ fontSize: '0.875rem' }}>
                         <div>{formatDate(request.start_date)}</div>
                         <div style={{ color: '#6b7280' }}>
-                          至 {formatDate(request.end_date)}
+                          to {formatDate(request.end_date)}
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span className="font-semibold">{request.total_days} 天</span>
+                      <span className="font-semibold">{request.total_days} days</span>
                     </td>
                     <td>
                       <span className={getStatusBadgeClass(request.status)}>
@@ -422,7 +393,7 @@ const HRLeaveRecords = () => {
                           setSelectedRequest(request);
                           setShowDetailModal(true);
                         }}
-                        title="查看詳情"
+                        title="View Details"
                       >
                         <Eye size={16} />
                       </button>
@@ -435,7 +406,7 @@ const HRLeaveRecords = () => {
         )}
       </div>
 
-      {/* 彈窗 */}
+      {/* Modal */}
       {renderRequestDetailModal()}
     </div>
   );

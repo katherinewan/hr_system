@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Eye, CheckCircle, XCircle, User, Mail, Phone, Building, 
-  AlertCircle, Loader, FileText, Calendar, Clock
+  AlertCircle, Loader, FileText, History, Clock
 } from 'lucide-react';
 
 const HRLeaveRequests = () => {
@@ -14,10 +14,17 @@ const HRLeaveRequests = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // API base URL
-  const API_BASE_URL = 'http://localhost:3001/api';
+  // API
+  const getApiUrl = () => {
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return 'http://localhost:3001';
+    }
+    return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  };
 
-  // 通用函數
+  const API_BASE_URL = `${getApiUrl()}/api`;
+
+  // Utility functions
   const showError = (message) => {
     setError(message);
     setSuccessMessage('');
@@ -30,7 +37,7 @@ const HRLeaveRequests = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('zh-TW');
+    return new Date(dateString).toLocaleDateString('en-US');
   };
 
   const getStatusBadgeClass = (status) => {
@@ -44,46 +51,116 @@ const HRLeaveRequests = () => {
 
   const getLeaveTypeLabel = (type) => {
     const labels = {
-      'sick_leave': '病假',
-      'annual_leave': '年假',
-      'casual_leave': '事假',
-      'maternity_leave': '產假',
-      'paternity_leave': '陪產假'
+      'sick_leave': 'Sick Leave',
+      'annual_leave': 'Annual Leave',
+      'casual_leave': 'Casual Leave',
+      'maternity_leave': 'Maternity Leave',
+      'paternity_leave': 'Paternity Leave'
     };
     return labels[type] || type;
   };
 
   const getStatusLabel = (status) => {
     const labels = {
-      'Pending': '待審核',
-      'Approved': '已批准',
-      'Rejected': '已拒絕',
-      'Cancelled': '已取消'
+      'Pending': 'Pending',
+      'Approved': 'Approved',
+      'Rejected': 'Rejected',
+      'Cancelled': 'Cancelled'
     };
     return labels[status] || status;
   };
 
-  // 載入待審核申請
   const loadPendingRequests = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
+      
+      console.log('🔍 API_BASE_URL:', API_BASE_URL);
+      console.log('🔍 Full URL:', `${API_BASE_URL}/holidays/requests/pending`);
+      
+      // First test if server is running
+      try {
+        const healthCheck = await fetch(`${getApiUrl()}/health`);
+        console.log('🏥 Health check status:', healthCheck.status);
+        if (healthCheck.ok) {
+          const healthData = await healthCheck.json();
+          console.log('🏥 Server status:', healthData);
+        }
+      } catch (healthError) {
+        console.warn('⚠️ Health check failed:', healthError.message);
+        showError('Unable to connect to server, please check if backend service is running');
+        return;
+      }
+      
+      // Test if holiday routes are available
+      try {
+        const testResponse = await fetch(`${API_BASE_URL}/holidays/test`);
+        console.log('🧪 Holiday route test status:', testResponse.status);
+        if (testResponse.ok) {
+          const testData = await testResponse.json();
+          console.log('🧪 Holiday routes available:', testData);
+        }
+      } catch (testError) {
+        console.warn('⚠️ Holiday route test failed:', testError.message);
+      }
+      
+      // Now try to get pending requests
+      console.log('📡 Fetching pending requests...');
       const response = await fetch(`${API_BASE_URL}/holidays/requests/pending`);
+      
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response OK:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ HTTP Error Details:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        
+        if (response.status === 404) {
+          showError('API endpoint does not exist. Please check backend server and route configuration.');
+        } else if (response.status === 500) {
+          showError('Internal server error. Please check backend logs.');
+        } else {
+          showError(`HTTP Error ${response.status}: ${response.statusText}`);
+        }
+        return;
+      }
+      
       const data = await response.json();
+      console.log('📦 Response data:', data);
       
       if (data.success) {
         setPendingRequests(data.data || []);
+        showSuccess(`Successfully loaded ${data.count || 0} pending requests`);
       } else {
-        showError(data.message || '無法載入待審核申請');
+        showError(data.message || 'Unable to load pending requests');
       }
+      
     } catch (error) {
-      showError('載入申請失敗，請檢查網路連接');
-      console.error('Error loading pending requests:', error);
+      console.error('❌ Complete error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        showError('Network connection failed. Please confirm:\n1. Backend server is running on localhost:3001\n2. Network connection is normal');
+      } else if (error.message.includes('404')) {
+        showError('API endpoint does not exist, please check backend route configuration');
+      } else if (error.message.includes('CORS')) {
+        showError('Cross-origin request blocked, please check CORS settings');
+      } else {
+        showError(`Loading failed: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // 處理申請（批准/拒絕）
+  // Handle request action (approve/reject)
   const handleRequestAction = async (requestId, action, comments = '') => {
     try {
       setIsProcessing(true);
@@ -95,7 +172,7 @@ const HRLeaveRequests = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          approver_id: 100002, // 應該從當前用戶獲取
+          approver_id: 100002, // Should get from current user
           comments: comments || undefined
         })
       });
@@ -103,21 +180,21 @@ const HRLeaveRequests = () => {
       const result = await response.json();
       
       if (result.success) {
-        showSuccess(`申請已${action === 'approve' ? '批准' : '拒絕'}`);
+        showSuccess(`Request has been ${action === 'approve' ? 'approved' : 'rejected'}`);
         setShowDetailModal(false);
         loadPendingRequests();
       } else {
-        showError(result.message || '操作失敗');
+        showError(result.message || 'Operation failed');
       }
     } catch (error) {
-      showError('網路錯誤，請稍後再試');
+      showError('Network error, please try again later');
       console.error('Error processing request:', error);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // 渲染申請詳情彈窗
+  // Render request detail modal
   const renderRequestDetailModal = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectForm, setShowRejectForm] = useState(false);
@@ -132,9 +209,9 @@ const HRLeaveRequests = () => {
               <div className="modal-title-section">
                 <h3 className="modal-title-with-icon">
                   <FileText size={24} />
-                  假期申請審核
+                  Leave Request Review
                 </h3>
-                <p>申請編號: {selectedRequest.request_id}</p>
+                <p>Request ID: {selectedRequest.request_id}</p>
               </div>
               <button 
                 className="close-btn" 
@@ -147,11 +224,11 @@ const HRLeaveRequests = () => {
           </div>
 
           <div className="modal-body">
-            {/* 員工資訊 */}
+            {/* Employee Information */}
             <div className="selected-staff-preview">
               <h4 className="preview-title">
                 <User size={16} />
-                員工資訊
+                Employee Information
               </h4>
               <div className="selected-staff-content">
                 <div className="selected-staff-avatar">
@@ -160,10 +237,10 @@ const HRLeaveRequests = () => {
                 <div className="selected-staff-info">
                   <div className="selected-staff-name">{selectedRequest.staff_name}</div>
                   <div className="selected-staff-detail">
-                    <Building size={12} /> {selectedRequest.department_name || '未分配部門'}
+                    <Building size={12} /> {selectedRequest.department_name || 'Unassigned Department'}
                   </div>
                   <div className="selected-staff-detail">
-                    <User size={12} /> {selectedRequest.position_title || '未分配職位'}
+                    <User size={12} /> {selectedRequest.position_title || 'Unassigned Position'}
                   </div>
                   <div className="selected-staff-detail">
                     <Mail size={12} /> {selectedRequest.staff_email}
@@ -172,10 +249,10 @@ const HRLeaveRequests = () => {
               </div>
             </div>
 
-            {/* 假期申請詳情 */}
+            {/* Leave Request Details */}
             <div className="salary-form-grid">
               <div className="form-group">
-                <label>假期類型</label>
+                <label>Leave Type</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   <span className="position-badge">
                     {getLeaveTypeLabel(selectedRequest.leave_type)}
@@ -184,7 +261,7 @@ const HRLeaveRequests = () => {
               </div>
 
               <div className="form-group">
-                <label>申請狀態</label>
+                <label>Request Status</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   <span className={getStatusBadgeClass(selectedRequest.status)}>
                     {getStatusLabel(selectedRequest.status)}
@@ -193,28 +270,28 @@ const HRLeaveRequests = () => {
               </div>
 
               <div className="form-group">
-                <label>開始日期</label>
+                <label>Start Date</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   {formatDate(selectedRequest.start_date)}
                 </div>
               </div>
 
               <div className="form-group">
-                <label>結束日期</label>
+                <label>End Date</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   {formatDate(selectedRequest.end_date)}
                 </div>
               </div>
 
               <div className="form-group">
-                <label>請假天數</label>
+                <label>Leave Days</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  <strong>{selectedRequest.total_days} 天</strong>
+                  <strong>{selectedRequest.total_days} days</strong>
                 </div>
               </div>
 
               <div className="form-group">
-                <label>申請日期</label>
+                <label>Application Date</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   {formatDate(selectedRequest.applied_on)}
                 </div>
@@ -222,7 +299,7 @@ const HRLeaveRequests = () => {
             </div>
 
             <div className="form-group">
-              <label>請假原因</label>
+              <label>Leave Reason</label>
               <div className="form-input" style={{ background: '#f8f9fa', minHeight: '80px' }}>
                 {selectedRequest.reason}
               </div>
@@ -230,7 +307,7 @@ const HRLeaveRequests = () => {
 
             {selectedRequest.emergency_contact && (
               <div className="form-group">
-                <label>緊急聯絡電話</label>
+                <label>Emergency Contact</label>
                 <div className="form-input" style={{ background: '#f8f9fa' }}>
                   <Phone size={16} style={{ display: 'inline', marginRight: '8px' }} />
                   {selectedRequest.emergency_contact}
@@ -242,24 +319,24 @@ const HRLeaveRequests = () => {
               <div className="form-group">
                 <div className="info-box">
                   <CheckCircle size={16} style={{ color: '#10b981', display: 'inline', marginRight: '8px' }} />
-                  <strong>已提供醫生證明</strong>
+                  <strong>Medical Certificate Provided</strong>
                 </div>
               </div>
             )}
 
-            {/* 拒絕表單 */}
+            {/* Reject Form */}
             {showRejectForm && (
               <div className="form-group">
                 <label className="form-label-with-icon">
                   <AlertCircle size={16} />
-                  拒絕原因 <span className="required">*</span>
+                  Rejection Reason <span className="required">*</span>
                 </label>
                 <textarea
                   className="form-input"
                   rows="4"
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="請說明拒絕此假期申請的原因..."
+                  placeholder="Please explain the reason for rejecting this leave request..."
                 />
               </div>
             )}
@@ -271,7 +348,7 @@ const HRLeaveRequests = () => {
               onClick={() => setShowDetailModal(false)}
               disabled={isProcessing}
             >
-              關閉
+              Close
             </button>
             
             {selectedRequest.status === 'Pending' && (
@@ -284,22 +361,22 @@ const HRLeaveRequests = () => {
                       disabled={isProcessing}
                     >
                       <XCircle size={16} />
-                      拒絕
+                      Reject
                     </button>
                     <button
                       className="btn btn-success"
-                      onClick={() => handleRequestAction(selectedRequest.request_id, 'approve', '已批准')}
+                      onClick={() => handleRequestAction(selectedRequest.request_id, 'approve', 'Approved')}
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
                         <>
                           <Loader size={16} className="animate-spin" />
-                          處理中...
+                          Processing...
                         </>
                       ) : (
                         <>
                           <CheckCircle size={16} />
-                          批准
+                          Approve
                         </>
                       )}
                     </button>
@@ -314,7 +391,7 @@ const HRLeaveRequests = () => {
                       }}
                       disabled={isProcessing}
                     >
-                      取消
+                      Cancel
                     </button>
                     <button
                       className="btn btn-danger"
@@ -324,12 +401,12 @@ const HRLeaveRequests = () => {
                       {isProcessing ? (
                         <>
                           <Loader size={16} className="animate-spin" />
-                          處理中...
+                          Processing...
                         </>
                       ) : (
                         <>
                           <XCircle size={16} />
-                          確認拒絕
+                          Confirm Rejection
                         </>
                       )}
                     </button>
@@ -343,12 +420,12 @@ const HRLeaveRequests = () => {
     );
   };
 
-  // 載入數據
+  // Load data
   useEffect(() => {
     loadPendingRequests();
   }, []);
 
-  // 篩選申請
+  // Filter requests
   const filteredRequests = pendingRequests.filter(request => {
     const matchesSearch = searchInput === '' || 
       request.staff_name.toLowerCase().includes(searchInput.toLowerCase()) ||
@@ -358,7 +435,7 @@ const HRLeaveRequests = () => {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      {/* 控制區域 */}
+      {/* Control Area */}
       <div className="controls">
         <div className="controls-wrapper">
           <div className="search-container">
@@ -367,7 +444,7 @@ const HRLeaveRequests = () => {
               <input
                 type="text"
                 className="search-input"
-                placeholder="搜尋員工姓名或假期類型..."
+                placeholder="Search employee name or leave type..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -378,13 +455,13 @@ const HRLeaveRequests = () => {
             onClick={loadPendingRequests}
             disabled={loading}
           >
-            <Calendar size={20} className="btn-icon" />
-            重新整理
+            <History size={20} className="btn-icon" />
+            Refresh
           </button>
         </div>
       </div>
 
-      {/* 成功/錯誤訊息 */}
+      {/* Success/Error Messages */}
       {successMessage && (
         <div style={{
           padding: '12px 20px',
@@ -403,35 +480,35 @@ const HRLeaveRequests = () => {
         </div>
       )}
 
-      {/* 內容 */}
+      {/* Content */}
       <div className="content">
         <h2 className="result-title">
-          待審核申請 ({filteredRequests.length})
+          Pending Requests ({filteredRequests.length})
         </h2>
 
         {loading ? (
           <div className="loading-state">
             <Loader size={48} className="animate-spin" />
-            <div>載入申請資料中...</div>
+            <div>Loading request data...</div>
           </div>
         ) : filteredRequests.length === 0 ? (
           <div className="empty-state">
             <FileText size={64} />
-            <h3>沒有待審核申請</h3>
-            <p>目前沒有需要審核的假期申請</p>
+            <h3>No Pending Requests</h3>
+            <p>There are currently no leave requests requiring review</p>
           </div>
         ) : (
           <div className="table-container">
             <table className="staff-table">
               <thead className="table-header">
                 <tr>
-                  <th>申請編號</th>
-                  <th>員工資訊</th>
-                  <th>假期類型</th>
-                  <th>日期範圍</th>
-                  <th>天數</th>
-                  <th>申請日期</th>
-                  <th>操作</th>
+                  <th>Request ID</th>
+                  <th>Employee Info</th>
+                  <th>Leave Type</th>
+                  <th>Date Range</th>
+                  <th>Days</th>
+                  <th>Applied Date</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -446,7 +523,7 @@ const HRLeaveRequests = () => {
                           fontWeight: '600',
                           marginTop: '2px'
                         }}>
-                          已等待 {request.days_pending} 天
+                          Pending {request.days_pending} days
                         </div>
                       )}
                     </td>
@@ -455,7 +532,7 @@ const HRLeaveRequests = () => {
                         <div className="employee-name">{request.staff_name}</div>
                         <div className="employee-id">ID: {request.staff_id}</div>
                         <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                          {request.department_name || '未分配部門'}
+                          {request.department_name || 'Unassigned Department'}
                         </div>
                       </div>
                     </td>
@@ -466,7 +543,7 @@ const HRLeaveRequests = () => {
                       {request.medical_certificate && (
                         <div style={{ fontSize: '0.7rem', color: '#10b981', marginTop: '2px' }}>
                           <CheckCircle size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                          有醫證
+                          Medical Cert
                         </div>
                       )}
                     </td>
@@ -474,12 +551,12 @@ const HRLeaveRequests = () => {
                       <div style={{ fontSize: '0.875rem' }}>
                         <div>{formatDate(request.start_date)}</div>
                         <div style={{ color: '#6b7280' }}>
-                          至 {formatDate(request.end_date)}
+                          to {formatDate(request.end_date)}
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span className="font-semibold">{request.total_days} 天</span>
+                      <span className="font-semibold">{request.total_days} days</span>
                     </td>
                     <td>
                       {formatDate(request.applied_on)}
@@ -491,15 +568,15 @@ const HRLeaveRequests = () => {
                           setSelectedRequest(request);
                           setShowDetailModal(true);
                         }}
-                        title="查看詳情"
+                        title="View Details"
                       >
                         <Eye size={16} />
                       </button>
                       <button
                         className="action-btn save-btn"
-                        onClick={() => handleRequestAction(request.request_id, 'approve', '快速批准')}
+                        onClick={() => handleRequestAction(request.request_id, 'approve', 'Quick Approval')}
                         disabled={isProcessing}
-                        title="快速批准"
+                        title="Quick Approve"
                       >
                         {isProcessing ? (
                           <Loader size={16} className="animate-spin" />
@@ -516,7 +593,7 @@ const HRLeaveRequests = () => {
         )}
       </div>
 
-      {/* 彈窗 */}
+      {/* Modal */}
       {renderRequestDetailModal()}
     </div>
   );

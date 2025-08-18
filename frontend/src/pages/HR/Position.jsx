@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Briefcase, Trash2, Plus, Edit3, Save, X, Filter, BarChart3, Building } from 'lucide-react';
+import { Search, Briefcase, Trash2, Plus, Edit3, Save, X, BarChart3, Building } from 'lucide-react';
 
 const PositionManagementSystem = () => {
   const [positionList, setPositionList] = useState([]);
@@ -7,7 +7,6 @@ const PositionManagementSystem = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [currentView, setCurrentView] = useState('table');
   const [resultTitle, setResultTitle] = useState('');
   const [editingPosition, setEditingPosition] = useState(null);
@@ -37,7 +36,7 @@ const PositionManagementSystem = () => {
 
   const API_BASE_URL = `${getApiUrl()}/api`;
 
-  // 職級選項
+  // 等級選項
   const levelOptions = [
     { value: 'Junior', label: 'Junior' },
     { value: 'Mid', label: 'Mid-Level' },
@@ -177,28 +176,9 @@ const PositionManagementSystem = () => {
     }
   };
 
-  // Filter positions by department
-  const filterByDepartment = (departmentId) => {
-    if (!departmentId) {
-      loadAllPositions();
-      return;
-    }
-
-    const filteredPositions = positionList.filter(position => 
-      position.department_id.toString() === departmentId.toString()
-    );
-    
-    const department = departmentList.find(d => d.department_id.toString() === departmentId.toString());
-    const departmentName = department ? department.department_name : 'Unknown Department';
-    
-    setPositionList(filteredPositions);
-    setResultTitle(`Positions in ${departmentName} (Total: ${filteredPositions.length} positions)`);
-  };
-
   // Clear results
   const clearResults = () => {
     setSearchInput('');
-    setSelectedDepartment('');
     loadAllPositions();
   };
 
@@ -211,13 +191,6 @@ const PositionManagementSystem = () => {
         loadAllPositions();
       }
     }
-  };
-
-  // Handle department filter change
-  const handleDepartmentFilter = (e) => {
-    const departmentId = e.target.value;
-    setSelectedDepartment(departmentId);
-    filterByDepartment(departmentId);
   };
 
   // Get level color class
@@ -832,21 +805,6 @@ const PositionManagementSystem = () => {
                 />
               </div>
             </div>
-
-            {/* Department Filter */}
-            <select
-              value={selectedDepartment}
-              onChange={handleDepartmentFilter}
-              className="btn btn-secondary"
-              style={{ minWidth: '180px' }}
-            >
-              <option value="">All Departments</option>
-              {departmentList.map(dept => (
-                <option key={dept.department_id} value={dept.department_id}>
-                  {dept.department_name}
-                </option>
-              ))}
-            </select>
 
             {/* Buttons */}
             <button
