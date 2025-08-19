@@ -16,9 +16,6 @@ app.use(cors({
     'http://localhost:3001',  // 備用端口
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
-    // 🆕 添加你的 Vercel 前端網址
-    'https://你的vercel網址.vercel.app',
-    // 或者如果你有自定義域名
     'https://hr-system-tau.vercel.app' // 這裡放你實際的 Vercel 網址
   ],
   credentials: true,

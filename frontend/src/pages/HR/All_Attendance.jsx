@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, Trash2, Plus, Edit, Save, X, Clock, Calendar, Filter } from 'lucide-react';
+import { Search, History, Trash2, Plus, Edit, Save, X, Loader } from 'lucide-react';
 
 const AttendanceManagementSystem = () => {
   const [attendanceList, setAttendanceList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+  const [successMessage, setSuccessMessage] = useState('');
+
   // Search parameters
   const [searchParams, setSearchParams] = useState({
     staff_id: '',
@@ -13,13 +14,6 @@ const AttendanceManagementSystem = () => {
     end_date: '',
     status: '',
     date: ''
-  });
-  
-  // Clock data parameters
-  const [clockData, setClockData] = useState({
-    staff_id: '',
-    type: 'check_in',
-    notes: ''
   });
   
   // Edit mode
@@ -30,8 +24,18 @@ const AttendanceManagementSystem = () => {
     status: ''
   });
 
-  // Modal states
-  const [showClockModal, setShowClockModal] = useState(false);
+  // Add attendance related state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    staff_id: '',
+    date: '',
+    check_in: '',
+    check_out: '',
+    status: 'Present'
+  });
+  const [addValidationErrors, setAddValidationErrors] = useState({});
+  const [isAdding, setIsAdding] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // API
   const getApiUrl = () => {
@@ -46,12 +50,35 @@ const AttendanceManagementSystem = () => {
   // Show error
   const showError = (message) => {
     setError(message);
+    setSuccessMessage('');
     setLoading(false);
+  };
+
+  // Show success message
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setError('');
+    setTimeout(() => setSuccessMessage(''), 5000);
   };
 
   // Clear error
   const clearError = () => {
     setError('');
+  };
+
+  // Convert HH:MM to HH:MM:SS format for backend
+  const convertToFullTimeFormat = (timeStr) => {
+    if (!timeStr) return '';
+    if (timeStr.length === 5) { // HH:MM format
+      return timeStr + ':00';
+    }
+    return timeStr;
+  };
+
+  // Convert HH:MM:SS to HH:MM format for display
+  const convertToDisplayFormat = (timeStr) => {
+    if (!timeStr) return '';
+    return timeStr.substring(0, 5); // Show only HH:MM
   };
 
   // Load all attendance records
@@ -105,44 +132,12 @@ const AttendanceManagementSystem = () => {
     }, 100);
   };
 
-  // Handle clock in/out
-  const handleClock = async () => {
-    if (!clockData.staff_id || !clockData.type) {
-      alert('Please fill in Employee ID and clock type');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/attendance/clock`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(clockData)
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert(data.message);
-        setClockData({ staff_id: '', type: 'check_in', notes: '' });
-        setShowClockModal(false);
-        loadAllAttendance();
-      } else {
-        alert(data.message || 'Clock in/out failed');
-      }
-    } catch (error) {
-      console.error('Clock error:', error);
-      alert('Error occurred during clock in/out');
-    }
-  };
-
   // Start editing
   const startEdit = (record) => {
     setEditingRecord(record.attendance_log);
     setEditData({
-      check_in: record.check_in || '',
-      check_out: record.check_out || '',
+      check_in: convertToDisplayFormat(record.check_in) || '',
+      check_out: convertToDisplayFormat(record.check_out) || '',
       status: record.status || ''
     });
   };
@@ -155,27 +150,37 @@ const AttendanceManagementSystem = () => {
 
   // Save edit
   const saveEdit = async () => {
+    setIsUpdating(true);
+    
     try {
+      const payload = {
+        check_in: convertToFullTimeFormat(editData.check_in),
+        check_out: convertToFullTimeFormat(editData.check_out),
+        status: editData.status
+      };
+
       const response = await fetch(`${API_BASE_URL}/attendance/${editingRecord}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editData)
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
 
       if (data.success) {
-        alert('Record updated successfully');
+        showSuccess('Attendance information updated successfully');
         cancelEdit();
         loadAllAttendance();
       } else {
-        alert(data.message || 'Update failed');
+        showError(data.message || 'Update failed');
       }
     } catch (error) {
       console.error('Update error:', error);
-      alert('Error occurred during update');
+      showError('Error occurred during update');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -193,27 +198,175 @@ const AttendanceManagementSystem = () => {
       const data = await response.json();
 
       if (data.success) {
-        alert('Record deleted successfully');
+        showSuccess('Attendance deleted successfully');
         loadAllAttendance();
       } else {
-        alert(data.message || 'Delete failed');
+        showError(data.message || 'Delete failed');
       }
     } catch (error) {
       console.error('Delete error:', error);
-      alert('Error occurred during deletion');
+      showError('Error occurred during deletion');
     }
   };
 
-  // Format time
-  const formatTime = (timeString) => {
-    if (!timeString) return '';
-    return timeString.substring(0, 5); // Show only HH:MM
+  // Handle add form input changes
+  const handleAddFormChange = (field, value) => {
+    setAddForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    if (addValidationErrors[field]) {
+      setAddValidationErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
   };
 
-  // Format date
+  // Validate add form data
+  const validateAddForm = () => {
+    const errors = {};
+    
+    if (!addForm.staff_id || !addForm.staff_id.toString().trim()) {
+      errors.staff_id = 'Staff ID is required';
+    } else if (!/^\d+$/.test(addForm.staff_id.toString())) {
+      errors.staff_id = 'Staff ID must be numeric';
+    }
+    
+    if (!addForm.date) {
+      errors.date = 'Date is required';
+    }
+    
+    if (!addForm.status) {
+      errors.status = 'Status is required';
+    }
+    
+    // If check_out is provided, check_in must also be provided
+    if (addForm.check_out && !addForm.check_in) {
+      errors.check_in = 'Check in time is required when check out time is provided';
+    }
+    
+    setAddValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Add attendance record
+  const addAttendance = async () => {
+    if (!validateAddForm()) {
+      return;
+    }
+    
+    setIsAdding(true);
+    
+    try {
+      const payload = {
+        staff_id: parseInt(addForm.staff_id),
+        date: addForm.date,
+        check_in: convertToFullTimeFormat(addForm.check_in),
+        check_out: convertToFullTimeFormat(addForm.check_out),
+        status: addForm.status
+      };
+
+      const response = await fetch(`${API_BASE_URL}/attendance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setAttendanceList(prev => [...prev, data.data]);
+        
+        setAddForm({
+          staff_id: '',
+          date: '',
+          check_in: '',
+          check_out: '',
+          status: 'Present'
+        });
+        setAddValidationErrors({});
+        setShowAddModal(false);
+        
+        showSuccess('Attendance record added successfully');
+        loadAllAttendance();
+      } else {
+        showError(data.message || 'Failed to add attendance record');
+      }
+    } catch (error) {
+      showError('Error occurred while adding attendance record');
+      console.error('Add error:', error);
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  // Open add modal
+  const openAddModal = () => {
+    setShowAddModal(true);
+    setAddForm({
+      staff_id: '',
+      date: new Date().toISOString().split('T')[0], // Today's date
+      check_in: '',
+      check_out: '',
+      status: 'Present'
+    });
+    setAddValidationErrors({});
+  };
+
+  // Close add modal
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setAddForm({
+      staff_id: '',
+      date: '',
+      check_in: '',
+      check_out: '',
+      status: 'Present'
+    });
+    setAddValidationErrors({});
+  };
+
+  // Format time for display
+  const formatTime = (timeString) => {
+    return convertToDisplayFormat(timeString);
+  };
+
+  // Format date to YYYY-MM-DD
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('en-US');
+    try {
+      // If already in YYYY-MM-DD format, return as is
+      if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateString;
+      }
+      
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString; // Return original if invalid
+      }
+      
+      // Format as YYYY-MM-DD
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return dateString;
+    }
+  };
+
+  // Check if time is late (after 09:00)
+  const isLate = (timeString) => {
+    if (!timeString) return false;
+    return convertToDisplayFormat(timeString) > "09:00";
+  };
+
+  // Check if time is overtime (after 18:01)
+  const isOvertime = (timeString) => {
+    if (!timeString) return false;
+    return convertToDisplayFormat(timeString) > "18:01";
   };
 
   // Get status badge class
@@ -242,100 +395,138 @@ const AttendanceManagementSystem = () => {
            searchParams.end_date || searchParams.status || searchParams.date;
   };
 
-  // Load all records when component mounts
-  useEffect(() => {
-    loadAllAttendance();
-  }, []);
-
-  // Clock modal
-  const ClockModal = () => {
-    if (!showClockModal) return null;
+  // Render add attendance modal
+  const renderAddModal = () => {
+    if (!showAddModal) return null;
 
     return (
       <div className="modal-overlay">
-        <div className="modal-content">
-          <div className="modal-header">
-            <div className="modal-header-content">
-              <div className="modal-title-section">
-                <h3 className="modal-title-with-icon">
-                  <Clock size={20} />
-                  Employee Clock In/Out
-                </h3>
-                <p>Please select employee and clock type</p>
-              </div>
-              <button 
-                onClick={() => setShowClockModal(false)}
-                className="close-btn"
-              >
-                <X size={20} />
-              </button>
+        <div className="modal-content modal-large">
+          <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3>Add New Attendance Record</h3>
+              <p>Fill out the form below to add a new attendance record</p>
             </div>
-          </div>
-
+            <button 
+              onClick={closeAddModal} 
+              className="close-btn"
+            >
+              <X size={20} />
+            </button>
+          </div>    
           <div className="modal-body">
-            <div className="form-group">
-              <label className="form-label-with-icon">
-                <Users size={16} />
-                Employee ID <span className="required">*</span>
-              </label>
-              <input
-                type="text"
-                value={clockData.staff_id}
-                onChange={(e) => setClockData({...clockData, staff_id: e.target.value})}
-                placeholder="Enter Employee ID"
-                className="form-input"
-              />
-            </div>
+            <form onSubmit={(e) => e.preventDefault()}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                <div className="form-group">
+                  <label htmlFor='add-staff-id'>Staff ID <span className="required">*</span></label>
+                  <input 
+                    id='add-staff-id' 
+                    type='number'  
+                    value={addForm.staff_id}
+                    onChange={(e) => handleAddFormChange('staff_id', e.target.value)}
+                    className={addValidationErrors.staff_id ? 'error' : ''}
+                    placeholder="Enter staff ID (numbers only)"
+                  />
+                  {addValidationErrors.staff_id && (
+                    <div className="validation-error">{addValidationErrors.staff_id}</div>
+                  )}
+                </div>
 
-            <div className="form-group">
-              <label className="form-label-with-icon">
-                <Clock size={16} />
-                Clock Type <span className="required">*</span>
-              </label>
-              <select
-                value={clockData.type}
-                onChange={(e) => setClockData({...clockData, type: e.target.value})}
-                className="form-select"
-              >
-                <option value="check_in">Clock In</option>
-                <option value="check_out">Clock Out</option>
-              </select>
-            </div>
+                <div className="form-group">
+                  <label htmlFor="add-date">Date <span className="required">*</span></label>
+                  <input
+                    id="add-date"
+                    type="date"
+                    value={addForm.date}
+                    onChange={(e) => handleAddFormChange('date', e.target.value)}
+                    className={addValidationErrors.date ? 'error' : ''}
+                  />
+                  {addValidationErrors.date && (
+                    <div className="validation-error">{addValidationErrors.date}</div>
+                  )}
+                </div>
 
-            <div className="form-group">
-              <label className="form-label-with-icon">
-                <Edit size={16} />
-                Notes
-              </label>
-              <input
-                type="text"
-                value={clockData.notes}
-                onChange={(e) => setClockData({...clockData, notes: e.target.value})}
-                placeholder="Optional notes"
-                className="form-input"
-              />
-            </div>
+                <div className="form-group">
+                  <label htmlFor="add-check-in">Check In Time</label>
+                  <input
+                    id="add-check-in"
+                    type="time"
+                    value={addForm.check_in}
+                    onChange={(e) => handleAddFormChange('check_in', e.target.value)}
+                    className={addValidationErrors.check_in ? 'error' : ''}
+                  />
+                  {addValidationErrors.check_in && (
+                    <div className="validation-error">{addValidationErrors.check_in}</div>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="add-check-out">Check Out Time</label>
+                  <input
+                    id="add-check-out"
+                    type="time"
+                    value={addForm.check_out}
+                    onChange={(e) => handleAddFormChange('check_out', e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{gridColumn: '1 / -1'}}>
+                  <label htmlFor="add-status">Status <span className="required">*</span></label>
+                  <select
+                    id="add-status"
+                    value={addForm.status}
+                    onChange={(e) => handleAddFormChange('status', e.target.value)}
+                    className={addValidationErrors.status ? 'error' : ''}
+                  >
+                    <option value="Present">Present</option>
+                    <option value="Absent">Absent</option>
+                    <option value="Late">Late</option>
+                    <option value="Sick Leave">Sick Leave</option>
+                    <option value="Annual Leave">Annual Leave</option>
+                    <option value="Overtime">Overtime</option>
+                  </select>
+                  {addValidationErrors.status && (
+                    <div className="validation-error">{addValidationErrors.status}</div>
+                  )}
+                </div>
+              </div>
+            </form>
           </div>
 
           <div className="modal-footer">
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => setShowClockModal(false)}
+            <button
+              type="button"
+              onClick={closeAddModal}
+              disabled={isAdding}
+              className="btn btn-secondary"
             >
               Cancel
             </button>
-            <button 
-              className="btn btn-success" 
-              onClick={handleClock}
+            <button
+              type="button"
+              onClick={addAttendance}
+              disabled={isAdding}
+              className="btn btn-success"
             >
-              <Clock className="btn-icon" />
-              Clock In/Out
+              {isAdding ? (
+                'Adding...'
+              ) : (
+                <>
+                  <Plus className="btn-icon" />
+                  Add Attendance Record
+                </>
+              )}
             </button>
           </div>
         </div>
       </div>
     );
   };
+
+  // Load all records when component mounts
+  useEffect(() => {
+    loadAllAttendance();
+  }, []);
 
   return (
     <div className="app-container">
@@ -355,16 +546,19 @@ const AttendanceManagementSystem = () => {
             {/* Search area */}
             <div className="search-container">
               <div style={{ marginBottom: '1rem' }}>
-                <div className="search-input-wrapper">
-                  <Search className="search-icon" />
-                  <input
-                    type="text"
-                    value={searchParams.staff_id}
-                    onChange={(e) => setSearchParams({...searchParams, staff_id: e.target.value})}
-                    placeholder="Search by employee ID or name..."
-                    className="search-input"
-                  />
-                </div>
+                <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
+                  <div className="search-input-wrapper">
+                    <Search className="search-icon" />
+                    <input
+                      type="text"
+                      value={searchParams.staff_id}
+                      onChange={(e) => setSearchParams({...searchParams, staff_id: e.target.value})}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      placeholder="Search by employee ID..."
+                      className="search-input"
+                    />
+                  </div>
+                </form>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -415,6 +609,7 @@ const AttendanceManagementSystem = () => {
               <button
                 onClick={handleSearch}
                 className="btn btn-primary"
+                disabled={loading}
               >
                 <Search className="btn-icon" />
                 Search
@@ -425,7 +620,7 @@ const AttendanceManagementSystem = () => {
                 disabled={loading}
                 className="btn btn-primary"
               >
-                <Users className="btn-icon" />
+                <History className="btn-icon" />
                 Refresh
               </button>
 
@@ -433,26 +628,37 @@ const AttendanceManagementSystem = () => {
                 <button
                   onClick={clearSearch}
                   className="btn btn-secondary"
+                  disabled={loading}
                 >
+                  <Trash2 className="btn-icon" />
                   Clear Search
                 </button>
               )}
 
               <button 
-                onClick={() => setShowClockModal(true)}
+                onClick={openAddModal}
                 className="btn btn-success"
+                disabled={loading}
               >
                 <Plus className="btn-icon" />
-                Employee Clock
+                Add Attendance Record
               </button>
             </div>
           </div>
         </div>
 
+        {/* Success Message Banner */}
+        {successMessage && (
+          <div style={{ padding: '12px 20px', backgroundColor: '#d1fae5', color: '#065f46', borderBottom: '1px solid #e5e7eb' }}>
+            {successMessage}
+          </div>
+        )}
+
         {/* Content */}
         <div className="content">
           {loading && (
             <div className="loading-state">
+              <Loader size={48} className="animate-spin" />
               <div>Loading attendance records...</div>
             </div>
           )}
@@ -506,9 +712,12 @@ const AttendanceManagementSystem = () => {
                               value={editData.check_in}
                               onChange={(e) => setEditData({...editData, check_in: e.target.value})}
                               className="edit-input"
+                              disabled={isUpdating}
                             />
                           ) : (
-                            formatTime(record.check_in)
+                            <span style={{ color: isLate(record.check_in) ? "red" : "inherit" }}>
+                              {formatTime(record.check_in) || '-'}
+                            </span>
                           )}
                         </td>
                         <td>
@@ -518,9 +727,12 @@ const AttendanceManagementSystem = () => {
                               value={editData.check_out}
                               onChange={(e) => setEditData({...editData, check_out: e.target.value})}
                               className="edit-input"
+                              disabled={isUpdating}
                             />
                           ) : (
-                            formatTime(record.check_out)
+                            <span style={{color: isOvertime(record.check_out) ? "orange" : "inherit"}}>
+                              {formatTime(record.check_out) || '-'}
+                            </span>
                           )}
                         </td>
                         <td>
@@ -534,6 +746,7 @@ const AttendanceManagementSystem = () => {
                               value={editData.status}
                               onChange={(e) => setEditData({...editData, status: e.target.value})}
                               className="edit-input"
+                              disabled={isUpdating}
                             >
                               <option value="Present">Present</option>
                               <option value="Absent">Absent</option>
@@ -555,13 +768,15 @@ const AttendanceManagementSystem = () => {
                                 onClick={saveEdit}
                                 className="action-btn save-btn"
                                 title="Save"
+                                disabled={isUpdating}
                               >
-                                <Save size={16} />
+                                {isUpdating ? <Loader size={16} className="animate-spin" /> : <Save size={16} />}
                               </button>
                               <button 
                                 onClick={cancelEdit}
                                 className="action-btn cancel-btn"
                                 title="Cancel"
+                                disabled={isUpdating}
                               >
                                 <X size={16} />
                               </button>
@@ -594,8 +809,8 @@ const AttendanceManagementSystem = () => {
           )}
         </div>
 
-        {/* Modals */}
-        <ClockModal />
+        {/* Add Modal */}
+        {renderAddModal()}
       </div>
     </div>
   );

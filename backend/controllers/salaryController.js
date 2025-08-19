@@ -2,10 +2,10 @@ const { query } = require('../config/database');
 
 console.log('💰 載入薪資控制器...');
 
-const validateSalaryData = (data, isUpdate = false) => {
+const validateSalaryData = (data, isUpdate = false, skipSalaryId = false) => {
   const errors = [];
   
-  if (!isUpdate && (!data.salary_id || data.salary_id === '')) {
+  if (!skipSalaryId && !isUpdate && (!data.salary_id || data.salary_id === '')) {
     errors.push('薪資ID為必填項');
   }
   
@@ -13,9 +13,7 @@ const validateSalaryData = (data, isUpdate = false) => {
     errors.push('員工ID為必填項');
   }
   
-  if (!data.position_id || data.position_id === '') {
-    errors.push('職位ID為必填項');
-  }
+  // 移除 position_id 驗證
   
   if (typeof data.basic_salary !== 'number' || data.basic_salary <= 0) {
     errors.push('基本薪資必須是正數');
@@ -28,6 +26,19 @@ const validateSalaryData = (data, isUpdate = false) => {
       errors.push(`${field} 必須是非負數`);
     }
   });
+  
+  // 驗證出糧卡欄位
+  if (data.card_number && typeof data.card_number !== 'string') {
+    errors.push('卡號碼必須是字符串格式');
+  }
+  
+  if (data.card_name && typeof data.card_name !== 'string') {
+    errors.push('卡名稱必須是字符串格式');
+  }
+  
+  if (data.bank_name && !['hsbc', 'hang_seng_bank', 'bank_of_china', 'standard_chartered', 'citibank', 'dbs_bank', 'icbc', 'boc_hong_kong', 'china_construction_bank', 'agricultural_bank_of_china', 'other'].includes(data.bank_name)) {
+    errors.push('銀行名稱必須是有效的選項');
+  }
   
   return errors;
 };
@@ -42,7 +53,6 @@ const getAllSalaries = async (req, res) => {
         s.salary_id,
         s.staff_id,
         st.name AS staff_name,
-        s.position_id,
         p.title AS position_title,
         s.basic_salary,
         s.al_allowance,
@@ -50,11 +60,14 @@ const getAllSalaries = async (req, res) => {
         s.ml_allowance,
         s.pl_allowance,
         s.cl_deduction,
+        s.card_number,
+        s.card_name,
+        s.bank_name,
         (s.basic_salary + COALESCE(s.al_allowance, 0) + COALESCE(s.sl_allowance, 0) + 
          COALESCE(s.ml_allowance, 0) + COALESCE(s.pl_allowance, 0) - COALESCE(s.cl_deduction, 0)) AS total_salary
       FROM salary s
       JOIN staff st ON s.staff_id = st.staff_id
-      JOIN position p ON s.position_id = p.position_id
+      LEFT JOIN position p ON st.position_id = p.position_id
       ORDER BY s.salary_id
     `);
     
@@ -94,7 +107,6 @@ const getSalaryById = async (req, res) => {
         s.salary_id,
         s.staff_id,
         st.name AS staff_name,
-        s.position_id,
         p.title AS position_title,
         s.basic_salary,
         s.al_allowance,
@@ -102,11 +114,14 @@ const getSalaryById = async (req, res) => {
         s.ml_allowance,
         s.pl_allowance,
         s.cl_deduction,
+        s.card_number,
+        s.card_name,
+        s.bank_name,
         (s.basic_salary + COALESCE(s.al_allowance, 0) + COALESCE(s.sl_allowance, 0) + 
          COALESCE(s.ml_allowance, 0) + COALESCE(s.pl_allowance, 0) - COALESCE(s.cl_deduction, 0)) AS total_salary
       FROM salary s
       JOIN staff st ON s.staff_id = st.staff_id
-      JOIN position p ON s.position_id = p.position_id
+      LEFT JOIN position p ON st.position_id = p.position_id
       WHERE s.salary_id = $1
     `, [salary_id]);
     
@@ -153,7 +168,6 @@ const getSalariesByStaffId = async (req, res) => {
         s.salary_id,
         s.staff_id,
         st.name AS staff_name,
-        s.position_id,
         p.title AS position_title,
         s.basic_salary,
         s.al_allowance,
@@ -161,11 +175,14 @@ const getSalariesByStaffId = async (req, res) => {
         s.ml_allowance,
         s.pl_allowance,
         s.cl_deduction,
+        s.card_number,
+        s.card_name,
+        s.bank_name,
         (s.basic_salary + COALESCE(s.al_allowance, 0) + COALESCE(s.sl_allowance, 0) + 
          COALESCE(s.ml_allowance, 0) + COALESCE(s.pl_allowance, 0) - COALESCE(s.cl_deduction, 0)) AS total_salary
       FROM salary s
       JOIN staff st ON s.staff_id = st.staff_id
-      JOIN position p ON s.position_id = p.position_id
+      LEFT JOIN position p ON st.position_id = p.position_id
       WHERE s.staff_id = $1
     `, [staff_id]);
     
@@ -199,7 +216,8 @@ const createSalary = async (req, res) => {
     const salaryData = req.body;
     console.log('📥 請求：創建新薪資', salaryData);
     
-    const errors = validateSalaryData(salaryData);
+    // Remove salary_id from validation since it's auto-generated
+    const errors = validateSalaryData(salaryData, false, true); // true = skip salary_id check
     if (errors.length > 0) {
       return res.status(400).json({
         success: false,
@@ -208,29 +226,48 @@ const createSalary = async (req, res) => {
       });
     }
     
-    // 檢查薪資ID是否已存在
-    const existingResult = await query('SELECT salary_id FROM salary WHERE salary_id = $1', [salaryData.salary_id]);
-    if (existingResult.rows.length > 0) {
+    // Check if staff already has a salary record
+    const existingStaffResult = await query('SELECT salary_id FROM salary WHERE staff_id = $1', [salaryData.staff_id]);
+    if (existingStaffResult.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '薪資ID已存在'
+        message: '該員工已有薪資記錄'
       });
     }
     
+    // Generate new salary_id (S + MAX + 1)
+    const maxResult = await query(`
+      SELECT salary_id FROM salary 
+      WHERE salary_id ~ '^S1[0-9]+$' 
+      ORDER BY CAST(SUBSTRING(salary_id FROM 3) AS INTEGER) DESC 
+      LIMIT 1
+    `);
+    
+    let newSalaryId;
+    if (maxResult.rows.length === 0) {
+      newSalaryId = 'S1001'; // First salary record
+    } else {
+      const maxId = maxResult.rows[0].salary_id;
+      const numPart = parseInt(maxId.substring(2)) + 1;
+      newSalaryId = `S1${numPart.toString().padStart(3, '0')}`;
+    }
+    
     const result = await query(`
-      INSERT INTO salary (salary_id, staff_id, position_id, basic_salary, al_allowance, sl_allowance, ml_allowance, pl_allowance, cl_deduction)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO salary (salary_id, staff_id, basic_salary, al_allowance, sl_allowance, ml_allowance, pl_allowance, cl_deduction, card_number, card_name, bank_name)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `, [
-      salaryData.salary_id,
+      newSalaryId,
       salaryData.staff_id,
-      salaryData.position_id,
       salaryData.basic_salary,
       salaryData.al_allowance || 0,
       salaryData.sl_allowance || 0,
       salaryData.ml_allowance || 0,
       salaryData.pl_allowance || 0,
-      salaryData.cl_deduction || 0
+      salaryData.cl_deduction || 0,
+      salaryData.card_number || null,
+      salaryData.card_name || null,
+      salaryData.bank_name || null
     ]);
     
     console.log(`✅ 成功創建薪資 ID ${result.rows[0].salary_id}`);
@@ -275,19 +312,22 @@ const updateSalary = async (req, res) => {
     
     const result = await query(`
       UPDATE salary 
-      SET staff_id = $1, position_id = $2, basic_salary = $3, al_allowance = $4, 
-          sl_allowance = $5, ml_allowance = $6, pl_allowance = $7, cl_deduction = $8
-      WHERE salary_id = $9
+      SET staff_id = $1, basic_salary = $2, al_allowance = $3, 
+          sl_allowance = $4, ml_allowance = $5, pl_allowance = $6, cl_deduction = $7,
+          card_number = $8, card_name = $9, bank_name = $10
+      WHERE salary_id = $11
       RETURNING *
     `, [
       salaryData.staff_id,
-      salaryData.position_id,
       salaryData.basic_salary,
       salaryData.al_allowance || 0,
       salaryData.sl_allowance || 0,
       salaryData.ml_allowance || 0,
       salaryData.pl_allowance || 0,
       salaryData.cl_deduction || 0,
+      salaryData.card_number || null,
+      salaryData.card_name || null,
+      salaryData.bank_name || null,
       salary_id
     ]);
     

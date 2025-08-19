@@ -14,7 +14,7 @@ console.log('📋 Loading user account controller...');
 
 const getAllUsers = async (req, res) => {
   try {
-    console.log('📥 Request: Get all users');
+    console.log('🔥 Request: Get all users');
     
     // Fixed JOIN query, correctly connecting user_accounts with staff table
     const result = await pool.query(`
@@ -23,8 +23,8 @@ const getAllUsers = async (req, res) => {
         ua.staff_id,
         s.name AS staff_name,
         ua.role,
-        ua.last_login,
-        ua.password_reset_expires,
+        TO_CHAR(ua.last_login, 'YYYY-MM-DD HH24:MI:SS') AS last_login,
+        TO_CHAR(ua.password_reset_expires, 'YYYY-MM-DD HH24:MI:SS') AS password_reset_expires,
         ua.failed_login_attempts,
         ua.account_locked,
         s.position_id AS staff_position,
@@ -71,8 +71,8 @@ const searchUsersByName = async (req, res) => {
         ua.staff_id,
         s.name AS staff_name,
         ua.role,
-        ua.last_login,
-        ua.password_reset_expires,
+        TO_CHAR(ua.last_login, 'YYYY-MM-DD HH24:MI:SS') AS last_login,
+        TO_CHAR(ua.password_reset_expires, 'YYYY-MM-DD HH24:MI:SS') AS password_reset_expires,
         ua.failed_login_attempts,
         ua.account_locked,
         s.position_id AS staff_position,
@@ -120,8 +120,8 @@ const searchUsersById = async (req, res) => {
         ua.staff_id,
         s.name AS staff_name,
         ua.role,
-        ua.last_login,
-        ua.password_reset_expires,
+        TO_CHAR(ua.last_login, 'YYYY-MM-DD HH24:MI:SS') AS last_login,
+        TO_CHAR(ua.password_reset_expires, 'YYYY-MM-DD HH24:MI:SS') AS password_reset_expires,
         ua.failed_login_attempts,
         ua.account_locked,
         s.position_id AS staff_position,
@@ -157,7 +157,7 @@ const searchUsersById = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { staff_id, password, role = 'employee' } = req.body;
+    const { staff_id, password, role = 'Employee' } = req.body;
     console.log('➕ Request: Create new user');
     console.log('📋 Request parameters:', { staff_id, role, password_length: password?.length });
 
@@ -170,7 +170,7 @@ const createUser = async (req, res) => {
       });
     }
 
-    // 🔥 重要：確保 staff_id 是整數（因為資料庫中是 integer 類型）
+    // 確保 staff_id 是整數
     let staffIdInt;
     if (typeof staff_id === 'number') {
       staffIdInt = staff_id;
@@ -206,7 +206,7 @@ const createUser = async (req, res) => {
       });
     }
 
-    // 檢查員工是否存在（使用整數類型的 staff_id）
+    // 檢查員工是否存在
     console.log('🔍 Checking if staff exists...');
     const staffExists = await pool.query(
       'SELECT staff_id, name FROM staff WHERE staff_id = $1',
@@ -223,7 +223,7 @@ const createUser = async (req, res) => {
     
     console.log('✅ Staff exists:', staffExists.rows[0]);
 
-    // 檢查用戶帳號是否已存在（使用整數類型的 staff_id）
+    // 檢查用戶帳號是否已存在
     console.log('🔍 Checking if user account already exists...');
     const existingUser = await pool.query(
       'SELECT user_id FROM user_accounts WHERE staff_id = $1',
@@ -240,7 +240,7 @@ const createUser = async (req, res) => {
 
     console.log('✅ Can create new user account');
 
-    // 🆕 獲取下一個可用的 user_id
+    // 手動獲取下一個可用的 user_id
     console.log('🔍 Getting next available user_id...');
     const nextIdResult = await pool.query('SELECT COALESCE(MAX(user_id), 0) + 1 AS next_id FROM user_accounts');
     const nextUserId = nextIdResult.rows[0].next_id;
@@ -252,7 +252,7 @@ const createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     console.log('✅ Password hashing completed');
 
-    // 創建用戶帳號（明確指定 user_id）
+    // 創建用戶帳號（手動指定 user_id）
     console.log('💾 Inserting user data into database...');
     const insertQuery = `
       INSERT INTO user_accounts (user_id, staff_id, password, role, failed_login_attempts, account_locked)
@@ -300,7 +300,7 @@ const createUser = async (req, res) => {
     } else if (error.code === '42703') {
       errorMessage = 'Table field does not exist';
     } else if (error.code === '23502') {
-      errorMessage = 'Required field is missing (not-null constraint violation)';
+      errorMessage = 'Required field is missing - trying manual user_id generation';
     } else if (error.message.includes('bcrypt')) {
       errorMessage = 'Password encryption failed - please ensure bcrypt is installed';
     }
@@ -389,7 +389,7 @@ const updateUserRole = async (req, res) => {
   try {
     const { user_id } = req.params;
     const { role } = req.body;
-    console.log('🔄 Request: Update user role, User ID:', user_id, 'New role:', role);
+    console.log('📄 Request: Update user role, User ID:', user_id, 'New role:', role);
 
     // Validate required parameters
     if (!user_id || !role) {
@@ -400,11 +400,11 @@ const updateUserRole = async (req, res) => {
     }
 
     // Validate role
-    const validRoles = ['admin', 'hr', 'manager', 'employee'];
-    if (!validRoles.includes(role.toLowerCase())) {
+    const validRoles = ['Admin', 'HR', 'Manager', 'Employee'];
+    if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid role type'
+        message: 'Invalid role type. Must be: Admin, HR, Manager, or Employee'
       });
     }
 
@@ -495,7 +495,7 @@ const updateUser = async (req, res) => {
   try {
     const { user_id } = req.params;
     const { role, account_locked } = req.body;
-    console.log('🔄 Request: Update user data, User ID:', user_id, 'Data:', { role, account_locked });
+    console.log('📄 Request: Update user data, User ID:', user_id, 'Data:', { role, account_locked });
 
     // Validate required parameters
     if (!user_id) {
@@ -525,8 +525,8 @@ const updateUser = async (req, res) => {
 
     if (role !== undefined) {
       // Validate role
-      const validRoles = ['admin', 'hr', 'manager', 'employee'];
-      if (!validRoles.includes(role.toLowerCase())) {
+      const validRoles = ['Admin', 'HR', 'Manager', 'Employee'];
+      if (!validRoles.includes(role)) {
         return res.status(400).json({
           success: false,
           message: 'Invalid role type'

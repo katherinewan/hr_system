@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Calendar, Download, Eye, DollarSign, Users, TrendingUp,
-  FileText, Filter, ChevronDown, Clock, Building, RefreshCw
+  FileText, ChevronDown, Clock, RefreshCw
 } from 'lucide-react';
 
 const PayrollManagement = () => {

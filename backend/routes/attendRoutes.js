@@ -10,7 +10,8 @@ const {
   markAttendance,
   getAttendanceReport,
   updateAttendance,
-  deleteAttendance
+  deleteAttendance,
+  createAttendance
 } = require('../controllers/attendController');
 
 // 記錄請求的中間件
@@ -41,5 +42,8 @@ router.put('/:attendance_log', updateAttendance);
 
 // DELETE /api/attendance/:attendance_log - 刪除出勤記錄
 router.delete('/:attendance_log', deleteAttendance);
+
+// POST /api/attendance - 創建新的出勤記錄
+router.post('/', createAttendance);
 
 module.exports = router;

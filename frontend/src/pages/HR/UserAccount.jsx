@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, Trash2, Lock, Unlock, X, Eye, EyeOff, Mail, CheckCircle, AlertCircle, Edit3, Save, Info, Loader, Plus, UserPlus } from 'lucide-react';
+import { Search, RefreshCw, Trash2, Lock, Unlock, X, Edit3, Save, Loader, Plus, UserPlus } from 'lucide-react';
 
 const UserAccountManagementSystem = () => {
   // --- Core state ---
@@ -22,7 +22,7 @@ const UserAccountManagementSystem = () => {
     staff_id: '',
     password: '',
     confirmPassword: '',
-    role: 'employee'
+    role: 'Employee'
   });
   const [addValidationErrors, setAddValidationErrors] = useState({});
   const [isAdding, setIsAdding] = useState(false);
@@ -150,7 +150,7 @@ const UserAccountManagementSystem = () => {
   const startEditing = (user) => {    
     setEditingUser(user.user_id);    
     const formData = {
-      role: user.role || 'employee',
+      role: user.role || 'Employee',
       account_status: user.account_status || 'active',
       account_locked: !!user.account_locked,
     };
@@ -169,12 +169,12 @@ const UserAccountManagementSystem = () => {
 
   // Handle edit form input changes
   const handleFormChange = (field, value) => {
-    console.log(`Form change: ${field} = ${value}`);
     setEditForm(prev => ({
       ...prev,
       [field]: value
     }));
     
+    // æ¸…é™¤è©²æ¬„ä½çš„é©—è­‰éŒ¯èª¤
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
         ...prev,
@@ -201,9 +201,9 @@ const UserAccountManagementSystem = () => {
   // Validate edit form data
   const validateEditForm = () => {
     const errs = {};
-    const validRoles = ['employee', 'manager', 'hr', 'admin'];
-    if (!validRoles.includes((editForm.role || '').toLowerCase())) {
-      errs.role = 'Role must be one of: employee, manager, hr, admin';
+    const validRoles = ['Employee', 'Manager', 'HR', 'Admin'];
+    if (!validRoles.includes((editForm.role || ''))) {
+      errs.role = 'Role must be one of: Employee, Manager, HR, Admin';
     }
     if (typeof editForm.account_locked !== 'boolean') {
       errs.account_locked = 'Account status must be Active or Locked';
@@ -230,7 +230,7 @@ const UserAccountManagementSystem = () => {
       errors.confirmPassword = 'Passwords do not match';
     }
     
-    const validRoles = ['employee', 'manager', 'hr', 'admin'];
+    const validRoles = ['Employee', 'Manager', 'HR', 'Admin'];
     if (!validRoles.includes(addForm.role)) {
       errors.role = 'Please select a valid role';
     }
@@ -301,7 +301,7 @@ const UserAccountManagementSystem = () => {
           staff_id: '',
           password: '',
           confirmPassword: '',
-          role: 'employee'
+          role: 'Employee'
         });
         setAddValidationErrors({});
         setShowAddModal(false);
@@ -327,7 +327,7 @@ const UserAccountManagementSystem = () => {
       staff_id: '',
       password: '',
       confirmPassword: '',
-      role: 'employee'
+      role: 'Employee'
     });
     setAddValidationErrors({});
     loadStaffList(); // Load available staff
@@ -340,7 +340,7 @@ const UserAccountManagementSystem = () => {
       staff_id: '',
       password: '',
       confirmPassword: '',
-      role: 'employee'
+      role: 'Employee'
     });
     setAddValidationErrors({});
   };
@@ -357,7 +357,8 @@ const UserAccountManagementSystem = () => {
       // Display mode
       switch (field) {
         case 'role':
-          return <span className="role-badge">{user.role || 'employee'}</span>;
+          return <span className={`role-badge ${getRoleBadgeColor(user.role)}`}>
+            {user.role || '無角色'}</span>;
         case 'account_locked':
           return user.account_locked ? (
             <span className="status-badge locked">
@@ -369,7 +370,7 @@ const UserAccountManagementSystem = () => {
             </span>
           );
         case 'last_login':
-          return user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never';
+          return user.last_login || 'Never';
         case 'failed_login_attempts':
           return user.failed_login_attempts || 0;
         default:
@@ -382,14 +383,14 @@ const UserAccountManagementSystem = () => {
       case 'role':
         return (
           <select
-            value={editForm.role || 'employee'}
+            value={editForm.role || 'Employee'}
             onChange={(e) => handleFormChange('role', e.target.value)}
             className={validationErrors.role ? 'error' : ''}
           >
-            <option value="employee">Employee</option>
-            <option value="manager">Manager</option>
-            <option value="hr">HR</option>
-            <option value="admin">Admin</option>
+            <option value="Employee">Employee</option>
+            <option value="Manager">Manager</option>
+            <option value="HR">HR</option>
+            <option value="Admin">Admin</option>
           </select>
         );
       case 'account_locked':
@@ -405,6 +406,21 @@ const UserAccountManagementSystem = () => {
         );
       default:
         return user[field] || 'N/A';
+    }
+  };
+
+  const getRoleBadgeColor = (role) => {
+    switch (role?.toLowerCase()) {
+      case 'admin':
+        return 'badge-admin';
+      case 'hr':
+        return 'badge-hr';
+      case 'manager':
+        return 'badge-manager';
+      case 'employee':
+        return 'badge-employee';
+      default:
+        return 'badge-default';
     }
   };
 
@@ -464,10 +480,10 @@ const UserAccountManagementSystem = () => {
                   onChange={(e) => handleAddFormChange('role', e.target.value)}
                   className={addValidationErrors.role ? 'error' : ''}
                 >
-                  <option value="employee">Employee</option>
-                  <option value="manager">Manager</option>
-                  <option value="hr">HR</option>
-                  <option value="admin">Admin</option>
+                  <option value="Employee">Employee</option>
+                  <option value="Manager">Manager</option>
+                  <option value="HR">HR</option>
+                  <option value="Admin">Admin</option>
                 </select>
                 {addValidationErrors.role && (
                   <div className="validation-error">{addValidationErrors.role}</div>
@@ -483,6 +499,12 @@ const UserAccountManagementSystem = () => {
                   onChange={(e) => handleAddFormChange('password', e.target.value)}
                   className={addValidationErrors.password ? 'error' : ''}
                   placeholder="Enter password (min 6 characters)"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 {addValidationErrors.password && (
                   <div className="validation-error">{addValidationErrors.password}</div>
@@ -498,6 +520,12 @@ const UserAccountManagementSystem = () => {
                   onChange={(e) => handleAddFormChange('confirmPassword', e.target.value)}
                   className={addValidationErrors.confirmPassword ? 'error' : ''}
                   placeholder="Confirm password"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 {addValidationErrors.confirmPassword && (
                   <div className="validation-error">{addValidationErrors.confirmPassword}</div>
@@ -649,16 +677,6 @@ const UserAccountManagementSystem = () => {
     loadStaffList();
   }, []);
 
-  // 修復搜索框自動填入 999999 的問題
-  useEffect(() => {
-    console.log('searchInput changed to:', searchInput);
-    // 如果搜索框被自動填入這些值，立即清除
-    if (searchInput === '999999' || searchInput === '99999' || searchInput === '9999' || searchInput === '999' || searchInput === '99' || searchInput === '9') {
-      console.log('Auto-clearing unwanted search input:', searchInput);
-      setSearchInput('');
-    }
-  }, [searchInput]);
-
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showStaffDropdown && !event.target.closest('.form-group')) setShowStaffDropdown(false);
@@ -694,7 +712,7 @@ const UserAccountManagementSystem = () => {
             </div>
 
             <button onClick={loadAllUsers} disabled={loading} className="btn btn-primary">
-              <Users className="btn-icon" /> Refresh
+              <RefreshCw className="btn-icon" /> Refresh
             </button>
 
             {searchInput && (

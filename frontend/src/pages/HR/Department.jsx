@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, History, Trash2, Plus, Edit3, Save, X, Loader, FileText } from 'lucide-react';
+import { Search, RefreshCw, Trash2, Plus, Edit3, Save, X, Loader, FileText } from 'lucide-react';
 
 const DepartmentManagementSystem = () => {
   const [departmentList, setDepartmentList] = useState([]);
@@ -605,7 +605,7 @@ const DepartmentManagementSystem = () => {
               disabled={loading}
               className="btn btn-primary"
             >
-              <History size={20} className="btn-icon" />
+              <RefreshCw size={20} className="btn-icon" />
               Refresh
             </button>
 

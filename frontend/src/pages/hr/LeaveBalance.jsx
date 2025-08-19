@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, BarChart3, AlertCircle, Loader, Trash2,
+  Search, RefreshCw, AlertCircle, Loader, Trash2,
   Edit3, Save, X
 } from 'lucide-react';
 
@@ -185,7 +185,7 @@ const HRLeaveBalances = () => {
             onClick={loadLeaveBalances}
             disabled={loading}
           >
-            <BarChart3 size={20} className="btn-icon" />
+            <RefreshCw size={20} className="btn-icon" />
             Refresh
           </button>
 

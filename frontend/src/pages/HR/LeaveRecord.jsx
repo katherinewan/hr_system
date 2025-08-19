@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, History, Eye, AlertCircle, Loader, 
+  Search, RefreshCw, Eye, AlertCircle, Loader, 
   Trash2, FileText, User, Building
 } from 'lucide-react';
 
@@ -282,7 +282,7 @@ const HRLeaveRecords = () => {
             onClick={loadAllRequests}
             disabled={loading}
           >
-            <History size={20} className="btn-icon" />
+            <RefreshCw size={20} className="btn-icon" />
             Refresh
           </button>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, Trash2, UserPlus, Edit3, Save, X, Plus, Loader } from 'lucide-react';
+import { Search, RefreshCw, Trash2, UserPlus, Edit3, Save, X, Plus, Loader } from 'lucide-react';
 
 const EmployeeManagementSystem = () => {
   const [staffList, setStaffList] = useState([]);
@@ -993,7 +993,7 @@ const EmployeeManagementSystem = () => {
               disabled={loading}
               className="btn btn-primary"
             >
-              <Users className="btn-icon" />
+              <RefreshCw className="btn-icon" />
               Refresh
             </button>
 

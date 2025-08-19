@@ -6,18 +6,19 @@ import {
   Trash2, 
   Save, 
   X, 
-  Eye, 
   DollarSign, 
   Users, 
   Calculator, 
   TrendingUp,
   Building,
   User,
-  RefreshCw
+  RefreshCw,
+  CreditCard
 } from 'lucide-react';
 
 const SalaryManagement = () => {
   const [salaries, setSalaries] = useState([]);
+  const [staffList, setStaffList] = useState([]);
   const [filteredSalaries, setFilteredSalaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -39,15 +40,16 @@ const SalaryManagement = () => {
   });
 
   const [formData, setFormData] = useState({
-    salary_id: '',
     staff_id: '',
-    position_id: '',
     basic_salary: '',
     al_allowance: '',
     sl_allowance: '',
     ml_allowance: '',
     pl_allowance: '',
-    cl_deduction: ''
+    cl_deduction: '',
+    card_number: '',
+    card_name: '',
+    bank_name: ''
   });
 
   const [departments] = useState([
@@ -61,6 +63,21 @@ const SalaryManagement = () => {
     { id: 'Customer Service', name: 'Customer Service Department' }
   ]);
 
+  const [bankOptions] = useState([
+    { value: '', label: 'Select Bank' },
+    { value: 'hsbc', label: 'HSBC' },
+    { value: 'hang_seng_bank', label: 'Hang Seng Bank' },
+    { value: 'bank_of_china', label: 'Bank of China' },
+    { value: 'standard_chartered', label: 'Standard Chartered' },
+    { value: 'citibank', label: 'Citibank' },
+    { value: 'dbs_bank', label: 'DBS Bank' },
+    { value: 'icbc', label: 'ICBC' },
+    { value: 'boc_hong_kong', label: 'BOC Hong Kong' },
+    { value: 'china_construction_bank', label: 'China Construction Bank' },
+    { value: 'agricultural_bank_of_china', label: 'Agricultural Bank of China' },
+    { value: 'other', label: 'Other' }
+  ]);
+
   // API
   const getApiUrl = () => {
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
@@ -71,11 +88,57 @@ const SalaryManagement = () => {
 
   const API_BASE_URL = `${getApiUrl()}/api`;
 
-  // Show success message
+// Show success message
   const showSuccess = (message) => {
     setSuccessMessage(message);
     setError('');
     setTimeout(() => setSuccessMessage(''), 5000);
+  };
+
+  // Get bank display name
+  const getBankDisplayName = (bankValue) => {
+    const bank = bankOptions.find(option => option.value === bankValue);
+    return bank ? bank.label : bankValue || 'N/A';
+  };
+
+  // Format card number for Hong Kong bank account format
+  const formatCardNumber = (cardNumber) => {
+    if (!cardNumber) return 'N/A';
+    return cardNumber;
+  };
+
+  // Load staff list
+  const loadStaffList = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/staff`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setStaffList(data.data);
+      } else {
+        console.error('Failed to load staff list:', data.message);
+      }
+    } catch (error) {
+      console.error('Error loading staff list:', error);
+    }
+  };
+
+  // Get available staff (staff without salary records)
+  const getAvailableStaff = () => {
+    const usedStaffIds = salaries.map(salary => salary.staff_id);
+    return staffList.filter(staff => !usedStaffIds.includes(staff.staff_id));
+  };
+
+  // Generate next salary ID
+  const generateNextSalaryId = () => {
+    if (salaries.length === 0) return 'S1';
+    
+    const maxId = salaries.reduce((max, salary) => {
+      const numPart = parseInt(salary.salary_id.substring(1));
+      return numPart > max ? numPart : max;
+    }, 0);
+    
+    return `S${maxId + 1}`;
   };
 
   // Fetch salaries from API
@@ -132,9 +195,19 @@ const SalaryManagement = () => {
     });
   };
 
-  // Initial data fetch
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
+  };
+
+// Initial data fetch
   useEffect(() => {
     fetchSalaries();
+    loadStaffList();
   }, []);
 
   // Enhanced filter salaries with unified search logic
@@ -147,7 +220,10 @@ const SalaryManagement = () => {
         (salary.staff_name && salary.staff_name.toLowerCase().includes(searchLower)) ||
         (salary.salary_id && salary.salary_id.toLowerCase().includes(searchLower)) ||
         (salary.position_title && salary.position_title.toLowerCase().includes(searchLower)) ||
-        (salary.staff_id && salary.staff_id.toString().includes(searchTerm))
+        (salary.staff_id && salary.staff_id.toString().includes(searchTerm)) ||
+        (salary.card_number && salary.card_number.toLowerCase().includes(searchLower)) ||
+        (salary.card_name && salary.card_name.toLowerCase().includes(searchLower)) ||
+        (salary.bank_name && salary.bank_name.toLowerCase().includes(searchLower))
       );
     }
 
@@ -171,7 +247,7 @@ const SalaryManagement = () => {
     return searchTerm || selectedDepartment !== 'all';
   };
 
-  // Create new salary
+// Create new salary
   const createSalary = async (salaryData) => {
     try {
       setSubmitting(true);
@@ -189,7 +265,8 @@ const SalaryManagement = () => {
       console.log('Create response:', data);
       
       if (data.success) {
-        await fetchSalaries(); // Refresh data
+        await fetchSalaries();
+        await loadStaffList();
         return { success: true, message: 'Salary created successfully' };
       } else {
         throw new Error(data.message || 'Failed to create salary');
@@ -220,7 +297,7 @@ const SalaryManagement = () => {
       console.log('Update response:', data);
       
       if (data.success) {
-        await fetchSalaries(); // Refresh data
+        await fetchSalaries();
         return { success: true, message: 'Salary updated successfully' };
       } else {
         throw new Error(data.message || 'Failed to update salary');
@@ -246,7 +323,8 @@ const SalaryManagement = () => {
       console.log('Delete response:', data);
       
       if (data.success) {
-        await fetchSalaries(); // Refresh data
+        await fetchSalaries();
+        await loadStaffList();
         return { success: true, message: 'Salary deleted successfully' };
       } else {
         throw new Error(data.message || 'Failed to delete salary');
@@ -257,21 +335,25 @@ const SalaryManagement = () => {
     }
   };
 
-  const handleCreate = () => {
+const handleCreate = () => {
     setModalMode('create');
     setError('');
+    const nextSalaryId = generateNextSalaryId();
     setFormData({
-      salary_id: '',
+      salary_id: nextSalaryId,
       staff_id: '',
-      position_id: '',
       basic_salary: '',
       al_allowance: '',
       sl_allowance: '',
       ml_allowance: '',
       pl_allowance: '',
-      cl_deduction: ''
+      cl_deduction: '',
+      card_number: '',
+      card_name: '',
+      bank_name: ''
     });
     setShowModal(true);
+    loadStaffList();
   };
 
   const handleEdit = (salary) => {
@@ -281,30 +363,15 @@ const SalaryManagement = () => {
     setFormData({
       salary_id: salary.salary_id,
       staff_id: salary.staff_id.toString(),
-      position_id: salary.position_id.toString(),
       basic_salary: salary.basic_salary.toString(),
       al_allowance: (salary.al_allowance || 0).toString(),
       sl_allowance: (salary.sl_allowance || 0).toString(),
       ml_allowance: (salary.ml_allowance || 0).toString(),
       pl_allowance: (salary.pl_allowance || 0).toString(),
-      cl_deduction: (salary.cl_deduction || 0).toString()
-    });
-    setShowModal(true);
-  };
-
-  const handleView = (salary) => {
-    setModalMode('view');
-    setError('');
-    setFormData({
-      salary_id: salary.salary_id,
-      staff_id: salary.staff_id.toString(),
-      position_id: salary.position_id.toString(),
-      basic_salary: salary.basic_salary.toString(),
-      al_allowance: (salary.al_allowance || 0).toString(),
-      sl_allowance: (salary.sl_allowance || 0).toString(),
-      ml_allowance: (salary.ml_allowance || 0).toString(),
-      pl_allowance: (salary.pl_allowance || 0).toString(),
-      cl_deduction: (salary.cl_deduction || 0).toString()
+      cl_deduction: (salary.cl_deduction || 0).toString(),
+      card_number: salary.card_number || '',
+      card_name: salary.card_name || '',
+      bank_name: salary.bank_name || ''
     });
     setShowModal(true);
   };
@@ -322,24 +389,30 @@ const SalaryManagement = () => {
 
   const handleSubmit = async () => {
     // Basic validation
-    if (!formData.salary_id || !formData.staff_id || !formData.position_id || !formData.basic_salary) {
-      setError('Please fill in all required fields (Salary ID, Staff ID, Position ID, Basic Salary)');
+    if (!formData.staff_id || !formData.basic_salary) {
+      setError('Please fill in all required fields (Staff ID, Basic Salary)');
       return;
     }
 
     setError('');
     
     const salaryData = {
-      salary_id: formData.salary_id,
       staff_id: parseInt(formData.staff_id),
-      position_id: parseInt(formData.position_id),
       basic_salary: parseFloat(formData.basic_salary),
       al_allowance: parseFloat(formData.al_allowance || 0),
       sl_allowance: parseFloat(formData.sl_allowance || 0),
       ml_allowance: parseFloat(formData.ml_allowance || 0),
       pl_allowance: parseFloat(formData.pl_allowance || 0),
-      cl_deduction: parseFloat(formData.cl_deduction || 0)
+      cl_deduction: parseFloat(formData.cl_deduction || 0),
+      card_number: formData.card_number || null,
+      card_name: formData.card_name || null,
+      bank_name: formData.bank_name || null
     };
+
+    // Add salary_id for create mode (auto-generated)
+    if (modalMode === 'create') {
+      salaryData.salary_id = formData.salary_id;
+    }
 
     let result;
     if (modalMode === 'create') {
@@ -357,15 +430,7 @@ const SalaryManagement = () => {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount || 0);
-  };
-
-  // Render content area
+// Render content area
   const renderContent = () => {
     if (loading) {
       return (
@@ -422,6 +487,7 @@ const SalaryManagement = () => {
                 <th>Allowances</th>
                 <th>Deductions</th>
                 <th>Total Salary</th>
+                <th>Payroll Card</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -475,15 +541,26 @@ const SalaryManagement = () => {
                       {formatCurrency(salary.total_salary)}
                     </span>
                   </td>
+                  <td>
+                    <div className="payroll-card-info">
+                      {salary.card_number ? (
+                        <>
+                          <div className="card-number">
+                            <CreditCard size={14} style={{ marginRight: '4px' }} />
+                            {formatCardNumber(salary.card_number)}
+                          </div>
+                          <div className="card-details">
+                            <div className="card-name">{salary.card_name}</div>
+                            <div className="bank-name">{getBankDisplayName(salary.bank_name)}</div>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="no-card">No card info</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="actions-cell">
                     <div className="edit-actions">
-                      <button
-                        className="action-btn edit-btn"
-                        onClick={() => handleView(salary)}
-                        title="View Details"
-                      >
-                        <Eye size={16} />
-                      </button>
                       <button
                         className="action-btn edit-btn"
                         onClick={() => handleEdit(salary)}
@@ -533,41 +610,165 @@ const SalaryManagement = () => {
                 <X size={16} />
               </button>
             </div>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon total">
+            <div className="stats-grid" style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '1.5rem',
+              marginTop: '1rem'
+            }}>
+              <div className="stat-card" style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '1.5rem',
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e5e7eb'
+              }}>
+                <div className="stat-icon total" style={{
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginRight: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <DollarSign size={24} />
                 </div>
                 <div className="stat-content">
-                  <div className="stat-value">{formatCurrency(stats.totalSalaries)}</div>
-                  <div className="stat-label">Total Salaries</div>
+                  <div className="stat-value" style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '4px'
+                  }}>
+                    {formatCurrency(stats.totalSalaries)}
+                  </div>
+                  <div className="stat-label" style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280'
+                  }}>
+                    Total Salaries
+                  </div>
                 </div>
               </div>
-              <div className="stat-card">
-                <div className="stat-icon average">
+
+              <div className="stat-card" style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '1.5rem',
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e5e7eb'
+              }}>
+                <div className="stat-icon average" style={{
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginRight: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <Calculator size={24} />
                 </div>
                 <div className="stat-content">
-                  <div className="stat-value">{formatCurrency(stats.averageSalary)}</div>
-                  <div className="stat-label">Average Salary</div>
+                  <div className="stat-value" style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '4px'
+                  }}>
+                    {formatCurrency(stats.averageSalary)}
+                  </div>
+                  <div className="stat-label" style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280'
+                  }}>
+                    Average Salary
+                  </div>
                 </div>
               </div>
-              <div className="stat-card">
-                <div className="stat-icon highest">
+
+              <div className="stat-card" style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '1.5rem',
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e5e7eb'
+              }}>
+                <div className="stat-icon highest" style={{
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginRight: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <TrendingUp size={24} />
                 </div>
                 <div className="stat-content">
-                  <div className="stat-value">{formatCurrency(stats.highestSalary)}</div>
-                  <div className="stat-label">Highest Salary</div>
+                  <div className="stat-value" style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '4px'
+                  }}>
+                    {formatCurrency(stats.highestSalary)}
+                  </div>
+                  <div className="stat-label" style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280'
+                  }}>
+                    Highest Salary
+                  </div>
                 </div>
               </div>
-              <div className="stat-card">
-                <div className="stat-icon employees">
+
+              <div className="stat-card" style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '1.5rem',
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e5e7eb'
+              }}>
+                <div className="stat-icon employees" style={{
+                  backgroundColor: '#8b5cf6',
+                  color: 'white',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginRight: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   <Users size={24} />
                 </div>
                 <div className="stat-content">
-                  <div className="stat-value">{stats.totalEmployees}</div>
-                  <div className="stat-label">Total Employees</div>
+                  <div className="stat-value" style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '4px'
+                  }}>
+                    {stats.totalEmployees}
+                  </div>
+                  <div className="stat-label" style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280'
+                  }}>
+                    Total Employees
+                  </div>
                 </div>
               </div>
             </div>
@@ -585,7 +786,7 @@ const SalaryManagement = () => {
                 <Search className="search-icon" size={20} />
                 <input
                   type="text"
-                  placeholder="Search by name, staff ID, salary ID, or position..."
+                  placeholder="Search by name, staff ID, salary ID, position, or card info..."
                   className="search-input"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -636,7 +837,6 @@ const SalaryManagement = () => {
                 className="btn btn-secondary"
                 onClick={() => setShowStats(true)}
               >
-                <TrendingUp className="btn-icon" size={18} />
                 Show Stats
               </button>
             )}
@@ -670,13 +870,11 @@ const SalaryManagement = () => {
                 <div className="modal-title-section">
                   <h3 className="modal-title-with-icon">
                     <DollarSign size={20} />
-                    {modalMode === 'create' ? 'Add New Salary' : 
-                     modalMode === 'edit' ? 'Edit Salary' : 'View Salary Details'}
+                    {modalMode === 'create' ? 'Add New Salary' : 'Edit Salary'}
                   </h3>
                   <p>
                     {modalMode === 'create' ? 'Enter salary information for a new employee' :
-                     modalMode === 'edit' ? 'Update salary information' : 
-                     'View detailed salary breakdown'}
+                     'Update salary information'}
                   </p>
                 </div>
                 <button 
@@ -702,55 +900,60 @@ const SalaryManagement = () => {
               <div className="salary-form-grid">
                 <div className="form-group">
                   <label className="form-label-with-icon">
-                    <User size={16} />
-                    Salary ID <span className="required">*</span>
+                    Salary ID
                   </label>
                   <input
                     type="text"
                     className="form-input"
-                    value={formData.salary_id}
-                    onChange={(e) => setFormData({...formData, salary_id: e.target.value})}
-                    placeholder="e.g., S1023"
-                    disabled={modalMode !== 'create' || submitting}
-                    required
+                    value={formData.salary_id || ''}
+                    disabled={true}
+                    placeholder="Auto-generated"
+                    style={{ backgroundColor: '#f9fafb', color: '#6b7280' }}
                   />
+                  <small style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                    Salary ID is automatically generated
+                  </small>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label-with-icon">
-                    <User size={16} />
-                    Staff ID <span className="required">*</span>
+                    Staff Member <span className="required">*</span>
                   </label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={formData.staff_id}
-                    onChange={(e) => setFormData({...formData, staff_id: e.target.value})}
-                    placeholder="e.g., 100023"
-                    disabled={modalMode === 'view' || submitting}
-                    required
-                  />
+                  {modalMode === 'create' ? (
+                    <>
+                      <select
+                        className="form-input"
+                        value={formData.staff_id}
+                        onChange={(e) => setFormData({...formData, staff_id: e.target.value})}
+                        disabled={submitting}
+                        required
+                      >
+                        <option value="">Select Staff Member</option>
+                        {getAvailableStaff().map(staff => (
+                          <option key={staff.staff_id} value={staff.staff_id}>
+                            {staff.staff_id} - {staff.name}
+                          </option>
+                        ))}
+                      </select>
+                      {getAvailableStaff().length === 0 && (
+                        <small style={{ color: '#ef4444', fontSize: '0.875rem' }}>
+                          No available staff members (all staff already have salary records)
+                        </small>
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={`${formData.staff_id} - ${salaries.find(s => s.salary_id === editingId)?.staff_name || 'Unknown'}`}
+                      disabled={true}
+                      style={{ backgroundColor: '#f9fafb', color: '#6b7280' }}
+                    />
+                  )}
                 </div>
 
                 <div className="form-group">
                   <label className="form-label-with-icon">
-                    <Building size={16} />
-                    Position ID <span className="required">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={formData.position_id}
-                    onChange={(e) => setFormData({...formData, position_id: e.target.value})}
-                    placeholder="e.g., 203"
-                    disabled={modalMode === 'view' || submitting}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label-with-icon">
-                    <DollarSign size={16} />
                     Basic Salary <span className="required">*</span>
                   </label>
                   <input
@@ -760,134 +963,63 @@ const SalaryManagement = () => {
                     value={formData.basic_salary}
                     onChange={(e) => setFormData({...formData, basic_salary: e.target.value})}
                     placeholder="e.g., 25000.00"
-                    disabled={modalMode === 'view' || submitting}
+                    disabled={submitting}
                     required
                   />
                 </div>
 
+                {/* Payroll Card Section */}
+                <div className="form-section-divider">
+                  <CreditCard size={20} />
+                  <h4>Payroll Card Information</h4>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label-with-icon">
-                    <Calculator size={16} />
-                    Annual Leave Allowance
+                    Card Number
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     className="form-input"
-                    value={formData.al_allowance}
-                    onChange={(e) => setFormData({...formData, al_allowance: e.target.value})}
-                    placeholder="e.g., 1136.36"
-                    disabled={modalMode === 'view' || submitting}
+                    value={formData.card_number}
+                    onChange={(e) => setFormData({...formData, card_number: e.target.value})}
+                    placeholder="e.g., 1234567890123456"
+                    disabled={submitting}
                   />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label-with-icon">
-                    <Calculator size={16} />
-                    Sick Leave Allowance
+                    Card Name
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     className="form-input"
-                    value={formData.sl_allowance}
-                    onChange={(e) => setFormData({...formData, sl_allowance: e.target.value})}
-                    placeholder="e.g., 909.09"
-                    disabled={modalMode === 'view' || submitting}
+                    value={formData.card_name}
+                    onChange={(e) => setFormData({...formData, card_name: e.target.value})}
+                    placeholder="e.g., John Doe"
+                    disabled={submitting}
                   />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label-with-icon">
-                    <Calculator size={16} />
-                    Maternity Leave Allowance
+                    Bank Name
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    value={formData.ml_allowance}
-                    onChange={(e) => setFormData({...formData, ml_allowance: e.target.value})}
-                    placeholder="e.g., 909.09"
-                    disabled={modalMode === 'view' || submitting}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label-with-icon">
-                    <Calculator size={16} />
-                    Personal Leave Allowance
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    value={formData.pl_allowance}
-                    onChange={(e) => setFormData({...formData, pl_allowance: e.target.value})}
-                    placeholder="e.g., 0.00"
-                    disabled={modalMode === 'view' || submitting}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label-with-icon">
-                    <Calculator size={16} />
-                    Casual Leave Deduction
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    value={formData.cl_deduction}
-                    onChange={(e) => setFormData({...formData, cl_deduction: e.target.value})}
-                    placeholder="e.g., 1136.36"
-                    disabled={modalMode === 'view' || submitting}
-                  />
+                  <select
+                    className="form-select"
+                    value={formData.bank_name}
+                    onChange={(e) => setFormData({...formData, bank_name: e.target.value})}
+                    disabled={submitting}
+                  >
+                    {bankOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-
-              {modalMode !== 'view' && (
-                <div className="info-box">
-                  <strong>Note:</strong> Daily rates are typically calculated from basic salary divided by 22 working days. 
-                  Allowances are usually 80% of the daily rate unless specified otherwise.
-                </div>
-              )}
-
-              {modalMode === 'view' && (
-                <div className="salary-summary">
-                  <h4>Salary Breakdown</h4>
-                  <div className="summary-grid">
-                    <div className="summary-item">
-                      <span>Basic Salary:</span>
-                      <span>{formatCurrency(parseFloat(formData.basic_salary || 0))}</span>
-                    </div>
-                    <div className="summary-item">
-                      <span>Total Allowances:</span>
-                      <span>{formatCurrency(
-                        parseFloat(formData.al_allowance || 0) +
-                        parseFloat(formData.sl_allowance || 0) +
-                        parseFloat(formData.ml_allowance || 0) +
-                        parseFloat(formData.pl_allowance || 0)
-                      )}</span>
-                    </div>
-                    <div className="summary-item">
-                      <span>Total Deductions:</span>
-                      <span>{formatCurrency(parseFloat(formData.cl_deduction || 0))}</span>
-                    </div>
-                    <div className="summary-item total">
-                      <span>Net Salary:</span>
-                      <span>{formatCurrency(
-                        parseFloat(formData.basic_salary || 0) +
-                        parseFloat(formData.al_allowance || 0) +
-                        parseFloat(formData.sl_allowance || 0) +
-                        parseFloat(formData.ml_allowance || 0) +
-                        parseFloat(formData.pl_allowance || 0) -
-                        parseFloat(formData.cl_deduction || 0)
-                      )}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="modal-footer">
@@ -900,28 +1032,26 @@ const SalaryManagement = () => {
                 }}
                 disabled={submitting}
               >
-                {modalMode === 'view' ? 'Close' : 'Cancel'}
+                Cancel
               </button>
-              {modalMode !== 'view' && (
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <>
-                      <RefreshCw className="btn-icon" size={16} style={{animation: 'spin 1s linear infinite'}} />
-                      {modalMode === 'create' ? 'Creating...' : 'Updating...'}
-                    </>
-                  ) : (
-                    <>
-                      <Save className="btn-icon" size={16} />
-                      {modalMode === 'create' ? 'Create Salary' : 'Update Salary'}
-                    </>
-                  )}
-                </button>
-              )}
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                onClick={handleSubmit}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <RefreshCw className="btn-icon" size={16} style={{animation: 'spin 1s linear infinite'}} />
+                    {modalMode === 'create' ? 'Creating...' : 'Updating...'}
+                  </>
+                ) : (
+                  <>
+                    <Save className="btn-icon" size={16} />
+                    {modalMode === 'create' ? 'Create Salary' : 'Update Salary'}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
