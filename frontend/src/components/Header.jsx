@@ -73,7 +73,6 @@ export default function ButtonAppBar() {
     }
   };
 
-  // 處理登出
   const handleLogout = () => {
     console.log('Logout clicked');
 
@@ -82,6 +81,7 @@ export default function ButtonAppBar() {
       localStorage.removeItem('authToken');
       localStorage.removeItem('userInfo');
       localStorage.removeItem('rememberedStaffId');
+      console.log('localStorage cleared successfully');
     } catch (err) {
       console.error('Error clearing localStorage:', err);
     }
@@ -89,8 +89,10 @@ export default function ButtonAppBar() {
     // 通知 App 或其他組件登出
     window.dispatchEvent(new Event('logout'));
 
-    // 導向登入頁
-    navigate('/App'); // 確保 Router 中有 /login 對應到 Loginform.jsx
+    // 使用 window.location 強制重導向到根路徑的登入頁
+    window.location.href = '/login';
+    
+    setDrawerOpen(false);
   };
 
 
@@ -132,7 +134,7 @@ export default function ButtonAppBar() {
     { text: 'Position', icon: <Smile />, path: '/hr/position', category: 'org' },
     { text: 'Department', icon: <Building2 />, path: '/hr/department', category: 'org' },
     { text: 'Settings', icon: <Settings />, path: '/hr/settings', category: 'system' },
-    { text: 'Sign Out', icon: <LogOut />, path: '/logout', category: 'auth', isLogout: true }
+    { text: 'Sign Out', icon: <LogOut />, path: '/login', category: 'auth', isLogout: true }
   ];
 
   const getCategoryTitle = (category) => {

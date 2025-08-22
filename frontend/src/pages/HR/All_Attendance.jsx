@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Search, History, Trash2, Plus, Edit, Save, X, Loader } from 'lucide-react';
+import { Search, History, Trash2, Plus, Edit, Save, X, Loader, Download } from 'lucide-react';
 
 const AttendanceManagementSystem = () => {
   const [attendanceList, setAttendanceList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Search parameters
   const [searchParams, setSearchParams] = useState({
@@ -79,6 +80,88 @@ const AttendanceManagementSystem = () => {
   const convertToDisplayFormat = (timeStr) => {
     if (!timeStr) return '';
     return timeStr.substring(0, 5); // Show only HH:MM
+  };
+
+  // CSV Download Function
+  const downloadCSV = () => {
+    if (attendanceList.length === 0) {
+      showError('No data available to download');
+      return;
+    }
+
+    setIsDownloading(true);
+    
+    try {
+      // Prepare CSV headers
+      const headers = [
+        'Record ID',
+        'Employee ID', 
+        'Date',
+        'Check In Time',
+        'Check Out Time',
+        'Total Hours',
+        'Status'
+      ];
+
+      // Prepare CSV data
+      const csvData = attendanceList.map(record => [
+        record.attendance_log || '',
+        record.staff_id || '',
+        formatDate(record.date) || '',
+        formatTime(record.check_in) || '',
+        formatTime(record.check_out) || '',
+        record.total_hours || '0',
+        record.status || ''
+      ]);
+
+      // Combine headers and data
+      const allRows = [headers, ...csvData];
+      
+      // Convert to CSV string
+      const csvContent = allRows.map(row => 
+        row.map(field => {
+          // Handle fields that contain commas, quotes, or line breaks
+          const stringField = String(field);
+          if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+            return '"' + stringField.replace(/"/g, '""') + '"';
+          }
+          return stringField;
+        }).join(',')
+      ).join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        
+        // Generate filename with date range or current date
+        let filename = 'attendance_records';
+        if (searchParams.start_date && searchParams.end_date) {
+          filename += `_${searchParams.start_date}_to_${searchParams.end_date}`;
+        } else if (searchParams.date) {
+          filename += `_${searchParams.date}`;
+        } else {
+          filename += `_${new Date().toISOString().split('T')[0]}`;
+        }
+        filename += '.csv';
+        
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showSuccess(`CSV file downloaded successfully! (${attendanceList.length} records)`);
+      }
+    } catch (error) {
+      console.error('CSV download error:', error);
+      showError('Error occurred while generating CSV file');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   // Load all attendance records
@@ -642,6 +725,21 @@ const AttendanceManagementSystem = () => {
               >
                 <Plus className="btn-icon" />
                 Add Attendance Record
+              </button>
+
+              {/* CSV Download Button */}
+              <button
+                onClick={downloadCSV}
+                disabled={loading || attendanceList.length === 0 || isDownloading}
+                className="btn btn-secondary"
+                title={attendanceList.length === 0 ? 'No data to download' : 'Download current results as CSV'}
+              >
+                {isDownloading ? (
+                  <Loader className="btn-icon animate-spin" />
+                ) : (
+                  <Download className="btn-icon" />
+                )}
+                {isDownloading ? 'Downloading...' : 'Download CSV'}
               </button>
             </div>
           </div>

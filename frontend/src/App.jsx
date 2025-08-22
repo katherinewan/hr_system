@@ -11,7 +11,7 @@ import HRHomepage from './pages/HR/HR_Homepage';  // HR 主頁面
 import StaffHomepage from './pages/staff/StaffHomepage';  // Staff 主頁面
 import StaffLeave from './pages/staff/StaffLeave';
 
-// Auth Hook
+// Auth Hook - 添加 logout 事件監聽
 const useAuth = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,8 +42,21 @@ const useAuth = () => {
       checkAuth();
     };
 
+    // 監聽登出事件 (從 Header 觸發)
+    const handleLogout = () => {
+      console.log('Logout event received');
+      setUser(null);
+      // 可選：強制重導向到登入頁
+      window.location.href = '/login';
+    };
+
     window.addEventListener('loginSuccess', handleLoginSuccess);
-    return () => window.removeEventListener('loginSuccess', handleLoginSuccess);
+    window.addEventListener('logout', handleLogout);
+    
+    return () => {
+      window.removeEventListener('loginSuccess', handleLoginSuccess);
+      window.removeEventListener('logout', handleLogout);
+    };
   }, []);
 
   const logout = () => {

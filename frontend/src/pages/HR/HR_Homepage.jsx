@@ -21,6 +21,7 @@ import Department from './Department';
 import Salary from './Salary';
 import LeaveManagement from './LeaveManagement.jsx';
 import Payroll from './Payroll.jsx';
+import LoginForm from '../../components/LoginForm.jsx';
 
 // Layout Component
 const Layout = ({ children }) => (
@@ -182,52 +183,6 @@ const DashboardHome = () => {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '1rem',
-        padding: '0 2rem',
-        marginBottom: '2rem'
-      }}>
-        {quickStats.map((stat, index) => (
-          <div key={index} style={{
-            backgroundColor: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <div style={{
-              backgroundColor: `var(--${stat.color}-50, #f0f9ff)`,
-              color: `var(--${stat.color}-600, #2563eb)`,
-              padding: '0.75rem',
-              borderRadius: '8px'
-            }}>
-              <stat.icon size={24} />
-            </div>
-            <div>
-              <div style={{ 
-                fontSize: '2rem', 
-                fontWeight: '700',
-                color: '#1f2937',
-                lineHeight: 1
-              }}>
-                {stat.value}
-              </div>
-              <div style={{ 
-                color: '#6b7280',
-                fontSize: '0.9rem'
-              }}>
-                {stat.label}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Quick Actions */}
       <div style={{
         backgroundColor: 'white',
@@ -251,7 +206,6 @@ const DashboardHome = () => {
           }}>
             Quick Actions
           </h2>
-          <Bell size={20} style={{ color: '#6b7280' }} />
         </div>
         
         <div style={{
@@ -394,13 +348,14 @@ const DashboardHome = () => {
   );
 };
 
-// Main Homepage Component
+// HR_Homepage.jsx - 修正後的路由配置
 export default function Homepage() {
   console.log('✅ HR Homepage component loaded');
   
   return (
     <Layout>
       <Routes>
+        <Route path="*" element={<DashboardHome />} />
         <Route path="/" element={<DashboardHome />} />
         <Route path="/staffs" element={<Staffinfo />} />
         <Route path="/staffinfo" element={<Staffinfo />} />
@@ -424,7 +379,8 @@ export default function Homepage() {
             <p style={{ color: '#6b7280' }}>Coming soon...</p>
           </div>
         } />
-        <Route path="*" element={<DashboardHome />} />
+        {/* 移除這行！這是造成問題的根源 */}
+        {/* <Route path="/login" element={<LoginForm />} /> */}
       </Routes>
     </Layout>
   );
