@@ -1,0 +1,13 @@
+檢查項目,描述,狀態 (✅/❌/進行中)
+表格標題,網頁表格有正確顯示標題（如：Attendance Records）,
+表格結構,有 thead (表頭) 和 tbody (表身)，結構清晰,
+欄位名稱,表頭名稱正確（Employee / Date / Check-in / Check-out / Status）,
+顏色設計,表格配色符合 Mood Board（主色 #254E70, 輔色 #e9eb9e）,
+間隔底色,偶數行有底色區分 (striped row),
+滑鼠懸停效果,tr:hover 有背景變化,
+邊框/間距,表格有清晰邊界，間距合理,
+響應式設計,在手機 / 平板能正常顯示,
+互動功能,可支援排序、搜尋或篩選,
+資料正確性,每行數據是否正確顯示（如日期格式 YYYY-MM-DD）,
+性能,大數據情況下表格仍可流暢顯示,
+整體觀感,符合 Simple、Professional、Trustworthy 感覺,

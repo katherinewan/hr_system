@@ -10,30 +10,30 @@ const {
   deleteDepartment 
 } = require('../controllers/departController');
 
-console.log('🏢 載入部門路由...');
+console.log('🏢 Loading department routes...');
 
-// GET /api/departments - 獲取所有部門
+// GET /api/departments - Get all departments
 router.get('/', getAllDepartments);
 
-// GET /api/departments/:department_id - 獲取單一部門
+// GET /api/departments/:department_id - Get single department
 router.get('/:department_id', getDepartmentById);
 
-// POST /api/departments - 新增部門
+// POST /api/departments - Create department
 router.post('/', createDepartment);
 
-// PUT /api/departments/:department_id - 更新部門
+// PUT /api/departments/:department_id - Update department
 router.put('/:department_id', updateDepartment);
 
-// DELETE /api/departments/:department_id - 刪除部門
+// DELETE /api/departments/:department_id - Delete department
 router.delete('/:department_id', deleteDepartment);
 
-// GET /api/departments/:department_id/positions - 獲取部門下的所有職位
+// GET /api/departments/:department_id/positions - Get all positions under department
 router.get('/:department_id/positions', async (req, res) => {
   try {
     const { department_id } = req.params;
-    console.log(`📥 請求：獲取部門 ${department_id} 的職位`);
+    console.log(`📥 Request: Get positions for department ${department_id}`);
     
-    // 檢查部門是否存在
+    // Check if department exists
     const departmentCheck = await query(
       'SELECT department_name FROM departments WHERE department_id = $1',
       [department_id]
@@ -42,7 +42,7 @@ router.get('/:department_id/positions', async (req, res) => {
     if (departmentCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到部門 ID ${department_id}`
+        message: `Department ID ${department_id} not found`
       });
     }
     
@@ -59,11 +59,11 @@ router.get('/:department_id/positions', async (req, res) => {
       ORDER BY p.level, p.title
     `, [department_id]);
     
-    console.log(`✅ 成功獲取部門 ${department_id} 的 ${result.rows.length} 個職位`);
+    console.log(`✅ Successfully retrieved ${result.rows.length} positions for department ${department_id}`);
     
     res.json({
       success: true,
-      message: `成功獲取部門「${departmentCheck.rows[0].department_name}」的職位資料`,
+      message: `Successfully retrieved position data for department "${departmentCheck.rows[0].department_name}"`,
       data: result.rows,
       count: result.rows.length,
       department: {
@@ -72,19 +72,19 @@ router.get('/:department_id/positions', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ 獲取部門職位錯誤:', error);
+    console.error('❌ Error retrieving department positions:', error);
     res.status(500).json({
       success: false,
-      message: '獲取部門職位資料失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve department position data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
-// GET /api/departments/stats/overview - 獲取部門統計信息
+// GET /api/departments/stats/overview - Get department statistics
 router.get('/stats/overview', async (req, res) => {
   try {
-    console.log('📥 請求：獲取部門統計信息');
+    console.log('📥 Request: Get department statistics');
     
     const result = await query(`
       SELECT 
@@ -103,7 +103,7 @@ router.get('/stats/overview', async (req, res) => {
       ) dept_stats ON d.department_id = dept_stats.department_id
     `);
     
-    // 獲取各部門的職位分布
+    // Get position distribution by department
     const departmentDistribution = await query(`
       SELECT 
         d.department_name,
@@ -116,22 +116,22 @@ router.get('/stats/overview', async (req, res) => {
       ORDER BY position_count DESC
     `);
     
-    console.log('✅ 成功獲取部門統計信息');
+    console.log('✅ Successfully retrieved department statistics');
     
     res.json({
       success: true,
-      message: '成功獲取部門統計信息',
+      message: 'Successfully retrieved department statistics',
       data: {
         overview: result.rows[0],
         departmentDistribution: departmentDistribution.rows
       }
     });
   } catch (error) {
-    console.error('❌ 獲取部門統計錯誤:', error);
+    console.error('❌ Error retrieving department statistics:', error);
     res.status(500).json({
       success: false,
-      message: '獲取部門統計信息失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve department statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });

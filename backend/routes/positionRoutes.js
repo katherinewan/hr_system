@@ -11,21 +11,21 @@ const {
   getPositionsByDepartment
 } = require('../controllers/positionController');
 
-console.log('📋 載入職位路由...');
+console.log('📋 Loading position routes...');
 
-// GET /api/positions - 獲取所有職位
+// GET /api/positions - Get all positions
 router.get('/', getAllPositions);
 
-// POST /api/positions - 新增職位
+// POST /api/positions - Create position
 router.post('/', createPosition);
 
-// GET /api/positions/department/:department_id - 根據部門獲取職位（需要在動態路由之前）
+// GET /api/positions/department/:department_id - Get positions by department (needs to be before dynamic routes)
 router.get('/department/:department_id', getPositionsByDepartment);
 
-// GET /api/positions/stats/overview - 獲取職位統計信息
+// GET /api/positions/stats/overview - Get position statistics
 router.get('/stats/overview', async (req, res) => {
   try {
-    console.log('📥 請求：獲取職位統計信息');
+    console.log('📥 Request: Get position statistics');
     
     const result = await query(`
       SELECT 
@@ -35,7 +35,7 @@ router.get('/stats/overview', async (req, res) => {
       FROM positions p
     `);
     
-    // 獲取職級分布
+    // Get level distribution
     const levelDistribution = await query(`
       SELECT 
         level,
@@ -45,7 +45,7 @@ router.get('/stats/overview', async (req, res) => {
       ORDER BY position_count DESC
     `);
     
-    // 獲取部門職位分布
+    // Get department position distribution
     const departmentDistribution = await query(`
       SELECT 
         d.department_name,
@@ -57,11 +57,11 @@ router.get('/stats/overview', async (req, res) => {
       ORDER BY position_count DESC
     `);
     
-    console.log('✅ 成功獲取職位統計信息');
+    console.log('✅ Successfully retrieved position statistics');
     
     res.json({
       success: true,
-      message: '成功獲取職位統計信息',
+      message: 'Successfully retrieved position statistics',
       data: {
         overview: result.rows[0],
         levelDistribution: levelDistribution.rows,
@@ -69,22 +69,22 @@ router.get('/stats/overview', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ 獲取職位統計錯誤:', error);
+    console.error('❌ Error retrieving position statistics:', error);
     res.status(500).json({
       success: false,
-      message: '獲取職位統計信息失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve position statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
-// GET /api/positions/:position_id - 獲取單一職位
+// GET /api/positions/:position_id - Get single position
 router.get('/:position_id', getPositionById);
 
-// PUT /api/positions/:position_id - 更新職位
+// PUT /api/positions/:position_id - Update position
 router.put('/:position_id', updatePosition);
 
-// DELETE /api/positions/:position_id - 刪除職位
+// DELETE /api/positions/:position_id - Delete position
 router.delete('/:position_id', deletePosition);
 
 module.exports = router;

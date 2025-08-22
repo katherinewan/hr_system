@@ -1,51 +1,51 @@
 // controllers/positionController.js
 const { query } = require('../config/database');
 
-console.log('📋 載入職位控制器...');
+console.log('📋 Loading position controller...');
 
-// 輔助函數：驗證職位數據
+// Helper function: Validate position data
 const validatePositionData = (data, isUpdate = false) => {
   const errors = [];
   
   if (!isUpdate && (!data.position_id || data.position_id === '')) {
-    errors.push('職位ID為必填項');
+    errors.push('Position ID is required');
   }
   
   if (!data.title || !data.title.trim()) {
-    errors.push('職位名稱為必填項');
+    errors.push('Position title is required');
   }
   
   if (!data.level || !data.level.trim()) {
-    errors.push('職級為必填項');
+    errors.push('Position level is required');
   }
   
   if (!data.department_id || data.department_id === '') {
-    errors.push('部門ID為必填項');
+    errors.push('Department ID is required');
   }
   
-  // 驗證職位名稱長度
+  // Validate position title length
   if (data.title && data.title.length > 100) {
-    errors.push('職位名稱不能超過100個字符');
+    errors.push('Position title cannot exceed 100 characters');
   }
   
-  // 驗證職級長度
+  // Validate position level length
   if (data.level && data.level.length > 100) {
-    errors.push('職級不能超過100個字符');
+    errors.push('Position level cannot exceed 100 characters');
   }
   
-  // 驗證職級是否有效（根據您資料庫中的實際數據）
+  // Validate if level is valid (based on actual data in your database)
   const validLevels = ['Junior', 'Mid', 'Senior', '初級', '中級', '高級', '主管', '經理', '總監'];
   if (data.level && !validLevels.includes(data.level)) {
-    errors.push('無效的職級');
+    errors.push('Invalid position level');
   }
   
   return errors;
 };
 
-// 獲取所有職位
+// Get all positions
 const getAllPositions = async (req, res) => {
   try {
-    console.log('📥 請求：獲取所有職位');
+    console.log('📥 Request: Get all positions');
     
     const result = await query(`
       SELECT 
@@ -59,34 +59,34 @@ const getAllPositions = async (req, res) => {
       ORDER BY p.department_id, p.level, p.title
     `);
     
-    console.log(`✅ 成功獲取 ${result.rows.length} 個職位`);
+    console.log(`✅ Successfully retrieved ${result.rows.length} positions`);
     
     res.json({
       success: true,
-      message: `成功獲取 ${result.rows.length} 個職位資料`,
+      message: `Successfully retrieved ${result.rows.length} position records`,
       data: result.rows,
       count: result.rows.length
     });
   } catch (error) {
-    console.error('❌ 獲取職位列表錯誤:', error);
+    console.error('❌ Error retrieving position list:', error);
     res.status(500).json({
       success: false,
-      message: '獲取職位資料失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve position data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 根據ID獲取單一職位
+// Get position by ID
 const getPositionById = async (req, res) => {
   try {
     const { position_id } = req.params;
-    console.log(`📥 請求：獲取職位 ID ${position_id}`);
+    console.log(`📥 Request: Get position ID ${position_id}`);
     
     if (!position_id) {
       return res.status(400).json({
         success: false,
-        message: '職位ID為必填參數'
+        message: 'Position ID is a required parameter'
       });
     }
     
@@ -105,44 +105,44 @@ const getPositionById = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到職位 ID ${position_id}`
+        message: `Position ID ${position_id} not found`
       });
     }
     
-    console.log(`✅ 成功獲取職位 ID ${position_id}`);
+    console.log(`✅ Successfully retrieved position ID ${position_id}`);
     
     res.json({
       success: true,
-      message: '成功獲取職位資料',
+      message: 'Successfully retrieved position data',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 獲取職位錯誤:', error);
+    console.error('❌ Error retrieving position:', error);
     res.status(500).json({
       success: false,
-      message: '獲取職位資料失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve position data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 新增職位
+// Create position
 const createPosition = async (req, res) => {
   try {
     const { position_id, title, level, department_id } = req.body;
-    console.log(`📥 請求：新增職位 ${title}`);
+    console.log(`📥 Request: Create position ${title}`);
     
-    // 驗證數據
+    // Validate data
     const validationErrors = validatePositionData(req.body);
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '數據驗證失敗',
+        message: 'Data validation failed',
         errors: validationErrors
       });
     }
     
-    // 檢查部門是否存在
+    // Check if department exists
     const departmentCheck = await query(
       'SELECT department_name FROM department WHERE department_id = $1',
       [department_id]
@@ -151,11 +151,11 @@ const createPosition = async (req, res) => {
     if (departmentCheck.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `部門 ID ${department_id} 不存在`
+        message: `Department ID ${department_id} does not exist`
       });
     }
     
-    // 檢查職位ID是否已存在
+    // Check if position ID already exists
     const existingPosition = await query(
       'SELECT position_id FROM position WHERE position_id = $1',
       [position_id]
@@ -164,11 +164,11 @@ const createPosition = async (req, res) => {
     if (existingPosition.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `職位 ID ${position_id} 已存在`
+        message: `Position ID ${position_id} already exists`
       });
     }
     
-    // 檢查同部門是否已有相同職位名稱
+    // Check if same position title already exists in the department
     const duplicateCheck = await query(
       'SELECT position_id FROM position WHERE title = $1 AND department_id = $2',
       [title, department_id]
@@ -177,20 +177,20 @@ const createPosition = async (req, res) => {
     if (duplicateCheck.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `該部門已存在職位「${title}」`
+        message: `Position "${title}" already exists in this department`
       });
     }
     
-    // 創建職位
+    // Create position
     const result = await query(`
       INSERT INTO position (position_id, title, level, department_id)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `, [position_id, title, level, department_id]);
     
-    console.log(`✅ 成功新增職位 ID ${result.rows[0].position_id}`);
+    console.log(`✅ Successfully created position ID ${result.rows[0].position_id}`);
     
-    // 獲取包含部門名稱的完整職位資料
+    // Get complete position data including department name
     const positionWithDept = await query(`
       SELECT 
         p.position_id,
@@ -205,53 +205,53 @@ const createPosition = async (req, res) => {
     
     res.status(201).json({
       success: true,
-      message: '職位新增成功',
+      message: 'Position created successfully',
       data: positionWithDept.rows[0] || result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 新增職位錯誤:', error);
+    console.error('❌ Error creating position:', error);
     
-    // 處理特定的PostgreSQL錯誤
-    if (error.code === '23505') { // 唯一性約束違反
+    // Handle specific PostgreSQL errors
+    if (error.code === '23505') { // Unique constraint violation
       return res.status(400).json({
         success: false,
-        message: '職位ID已存在'
+        message: 'Position ID already exists'
       });
     }
     
-    if (error.code === '23503') { // 外鍵約束違反
+    if (error.code === '23503') { // Foreign key constraint violation
       return res.status(400).json({
         success: false,
-        message: '指定的部門不存在'
+        message: 'Specified department does not exist'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: '新增職位失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to create position',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 更新職位
+// Update position
 const updatePosition = async (req, res) => {
   try {
     const { position_id } = req.params;
     const { title, level, department_id } = req.body;
-    console.log(`📥 請求：更新職位 ID ${position_id}`);
+    console.log(`📥 Request: Update position ID ${position_id}`);
     
-    // 驗證數據（更新時不需要驗證position_id）
+    // Validate data (no need to validate position_id for updates)
     const validationErrors = validatePositionData(req.body, true);
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '數據驗證失敗',
+        message: 'Data validation failed',
         errors: validationErrors
       });
     }
     
-    // 檢查職位是否存在
+    // Check if position exists
     const existingPosition = await query(
       'SELECT title FROM position WHERE position_id = $1',
       [position_id]
@@ -260,11 +260,11 @@ const updatePosition = async (req, res) => {
     if (existingPosition.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到職位 ID ${position_id}`
+        message: `Position ID ${position_id} not found`
       });
     }
     
-    // 檢查部門是否存在
+    // Check if department exists
     const departmentCheck = await query(
       'SELECT department_name FROM department WHERE department_id = $1',
       [department_id]
@@ -273,11 +273,11 @@ const updatePosition = async (req, res) => {
     if (departmentCheck.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `部門 ID ${department_id} 不存在`
+        message: `Department ID ${department_id} does not exist`
       });
     }
     
-    // 檢查同部門是否已有相同職位名稱（排除自己）
+    // Check if same position title already exists in the department (excluding self)
     const duplicateCheck = await query(
       'SELECT position_id FROM position WHERE title = $1 AND department_id = $2 AND position_id != $3',
       [title, department_id, position_id]
@@ -286,7 +286,7 @@ const updatePosition = async (req, res) => {
     if (duplicateCheck.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `該部門已存在職位「${title}」`
+        message: `Position "${title}" already exists in this department`
       });
     }
     
@@ -297,9 +297,9 @@ const updatePosition = async (req, res) => {
       RETURNING *
     `, [title, level, department_id, position_id]);
     
-    console.log(`✅ 成功更新職位 ID ${result.rows[0].position_id}`);
+    console.log(`✅ Successfully updated position ID ${result.rows[0].position_id}`);
     
-    // 獲取包含部門名稱的完整職位資料
+    // Get complete position data including department name
     const positionWithDept = await query(`
       SELECT 
         p.position_id,
@@ -314,49 +314,49 @@ const updatePosition = async (req, res) => {
     
     res.json({
       success: true,
-      message: '職位更新成功',
+      message: 'Position updated successfully',
       data: positionWithDept.rows[0] || result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 更新職位錯誤:', error);
+    console.error('❌ Error updating position:', error);
     
-    // 處理特定的PostgreSQL錯誤
+    // Handle specific PostgreSQL errors
     if (error.code === '23505') {
       return res.status(400).json({
         success: false,
-        message: '職位名稱已存在於該部門'
+        message: 'Position title already exists in this department'
       });
     }
     
     if (error.code === '23503') {
       return res.status(400).json({
         success: false,
-        message: '指定的部門不存在'
+        message: 'Specified department does not exist'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: '更新職位失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to update position',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 刪除職位
+// Delete position
 const deletePosition = async (req, res) => {
   try {
     const { position_id } = req.params;
-    console.log(`📥 請求：刪除職位 ID ${position_id}`);
+    console.log(`📥 Request: Delete position ID ${position_id}`);
     
     if (!position_id) {
       return res.status(400).json({
         success: false,
-        message: '職位ID為必填參數'
+        message: 'Position ID is a required parameter'
       });
     }
     
-    // 檢查職位是否存在
+    // Check if position exists
     const existingPosition = await query(
       'SELECT title FROM position WHERE position_id = $1',
       [position_id]
@@ -365,11 +365,11 @@ const deletePosition = async (req, res) => {
     if (existingPosition.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到職位 ID ${position_id}`
+        message: `Position ID ${position_id} not found`
       });
     }
     
-    // 檢查是否有員工使用此職位（如果有 staff 表的話）
+    // Check if there are employees using this position (if staff table exists)
     try {
       const staffCheck = await query(
         'SELECT COUNT(*) as count FROM staff WHERE position_id = $1',
@@ -380,47 +380,47 @@ const deletePosition = async (req, res) => {
       if (staffCount > 0) {
         return res.status(400).json({
           success: false,
-          message: `無法刪除職位，仍有 ${staffCount} 名員工使用此職位`
+          message: `Cannot delete position, ${staffCount} employees are still using this position`
         });
       }
     } catch (staffError) {
-      // 如果 staff 表不存在，繼續執行刪除操作
-      console.log('📝 staff 表可能不存在，跳過員工檢查');
+      // If staff table doesn't exist, continue with deletion
+      console.log('📝 Staff table may not exist, skipping employee check');
     }
     
-    // 刪除職位
+    // Delete position
     await query('DELETE FROM position WHERE position_id = $1', [position_id]);
     
-    console.log(`✅ 成功刪除職位 ID ${position_id} (${existingPosition.rows[0].title})`);
+    console.log(`✅ Successfully deleted position ID ${position_id} (${existingPosition.rows[0].title})`);
     
     res.json({
       success: true,
-      message: `職位「${existingPosition.rows[0].title}」(ID: ${position_id}) 已成功刪除`
+      message: `Position "${existingPosition.rows[0].title}" (ID: ${position_id}) has been successfully deleted`
     });
   } catch (error) {
-    console.error('❌ 刪除職位錯誤:', error);
+    console.error('❌ Error deleting position:', error);
     
-    // 處理外鍵約束錯誤
+    // Handle foreign key constraint errors
     if (error.code === '23503') {
       return res.status(400).json({
         success: false,
-        message: '無法刪除職位，該職位正被其他記錄引用'
+        message: 'Cannot delete position, it is referenced by other records'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: '刪除職位失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to delete position',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 根據部門獲取職位
+// Get positions by department
 const getPositionsByDepartment = async (req, res) => {
   try {
     const { department_id } = req.params;
-    console.log(`📥 請求：獲取部門 ${department_id} 的職位`);
+    console.log(`📥 Request: Get positions for department ${department_id}`);
     
     const result = await query(`
       SELECT 
@@ -435,20 +435,20 @@ const getPositionsByDepartment = async (req, res) => {
       ORDER BY p.level, p.title
     `, [department_id]);
     
-    console.log(`✅ 成功獲取部門 ${department_id} 的 ${result.rows.length} 個職位`);
+    console.log(`✅ Successfully retrieved ${result.rows.length} positions for department ${department_id}`);
     
     res.json({
       success: true,
-      message: `成功獲取部門職位資料`,
+      message: `Successfully retrieved department position data`,
       data: result.rows,
       count: result.rows.length
     });
   } catch (error) {
-    console.error('❌ 獲取部門職位錯誤:', error);
+    console.error('❌ Error retrieving department positions:', error);
     res.status(500).json({
       success: false,
-      message: '獲取部門職位資料失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve department position data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };

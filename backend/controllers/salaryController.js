@@ -1,52 +1,52 @@
 const { query } = require('../config/database');
 
-console.log('💰 載入薪資控制器...');
+console.log('💰 Loading salary controller...');
 
 const validateSalaryData = (data, isUpdate = false, skipSalaryId = false) => {
   const errors = [];
   
   if (!skipSalaryId && !isUpdate && (!data.salary_id || data.salary_id === '')) {
-    errors.push('薪資ID為必填項');
+    errors.push('Salary ID is required');
   }
   
   if (!data.staff_id || data.staff_id === '') {
-    errors.push('員工ID為必填項');
+    errors.push('Staff ID is required');
   }
   
-  // 移除 position_id 驗證
+  // Remove position_id validation
   
   if (typeof data.basic_salary !== 'number' || data.basic_salary <= 0) {
-    errors.push('基本薪資必須是正數');
+    errors.push('Basic salary must be a positive number');
   }
   
-  // 驗證津貼欄位（可選，但如果提供必須是非負數）
+  // Validate allowance fields (optional, but if provided must be non-negative)
   const allowanceFields = ['al_allowance', 'sl_allowance', 'ml_allowance', 'pl_allowance', 'cl_deduction'];
   allowanceFields.forEach(field => {
     if (data[field] !== undefined && (typeof data[field] !== 'number' || data[field] < 0)) {
-      errors.push(`${field} 必須是非負數`);
+      errors.push(`${field} must be a non-negative number`);
     }
   });
   
-  // 驗證出糧卡欄位
+  // Validate payment card fields
   if (data.card_number && typeof data.card_number !== 'string') {
-    errors.push('卡號碼必須是字符串格式');
+    errors.push('Card number must be a string format');
   }
   
   if (data.card_name && typeof data.card_name !== 'string') {
-    errors.push('卡名稱必須是字符串格式');
+    errors.push('Card name must be a string format');
   }
   
   if (data.bank_name && !['hsbc', 'hang_seng_bank', 'bank_of_china', 'standard_chartered', 'citibank', 'dbs_bank', 'icbc', 'boc_hong_kong', 'china_construction_bank', 'agricultural_bank_of_china', 'other'].includes(data.bank_name)) {
-    errors.push('銀行名稱必須是有效的選項');
+    errors.push('Bank name must be a valid option');
   }
   
   return errors;
 };
 
-// 獲取所有薪資
+// Get all salaries
 const getAllSalaries = async (req, res) => {
   try {
-    console.log('📥 請求：獲取所有薪資');
+    console.log('📥 Request: Get all salaries');
     
     const result = await query(`
       SELECT 
@@ -71,19 +71,19 @@ const getAllSalaries = async (req, res) => {
       ORDER BY s.salary_id
     `);
     
-    console.log(`✅ 成功獲取 ${result.rows.length} 條薪資記錄`);
+    console.log(`✅ Successfully retrieved ${result.rows.length} salary records`);
     
     res.json({
       success: true,
-      message: `成功獲取 ${result.rows.length} 條薪資資料`,
+      message: `Successfully retrieved ${result.rows.length} salary records`,
       data: result.rows,
       count: result.rows.length
     });
   } catch (error) {
-    console.error('❌ 獲取薪資列表錯誤:', error);
+    console.error('❌ Error retrieving salary list:', error);
     res.status(500).json({
       success: false,
-      message: '獲取薪資資料失敗',
+      message: 'Failed to retrieve salary data',
       error: error.message
     });
   }
@@ -92,13 +92,13 @@ const getAllSalaries = async (req, res) => {
 const getSalaryById = async (req, res) => {
   try {
     const { salary_id } = req.params;
-    console.log(`📥 請求：獲取薪資 ID ${salary_id}`);
+    console.log(`📥 Request: Get salary ID ${salary_id}`);
     
-    // 驗證 ID 格式 - 支援 S1xxx 格式
+    // Validate ID format - support S1xxx format
     if (!/^S1\d{3}$/.test(salary_id)) {
       return res.status(400).json({
         success: false,
-        message: '薪資 ID 格式不正確，應為 S1xxx 格式'
+        message: 'Salary ID format is incorrect, should be S1xxx format'
       });
     }
     
@@ -128,38 +128,38 @@ const getSalaryById = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '未找到該薪資記錄'
+        message: 'Salary record not found'
       });
     }
     
-    console.log(`✅ 成功獲取薪資 ID ${salary_id}`);
+    console.log(`✅ Successfully retrieved salary ID ${salary_id}`);
     
     res.json({
       success: true,
-      message: '成功獲取薪資資料',
+      message: 'Successfully retrieved salary data',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 獲取薪資錯誤:', error);
+    console.error('❌ Error retrieving salary:', error);
     res.status(500).json({
       success: false,
-      message: '獲取薪資資料失敗',
+      message: 'Failed to retrieve salary data',
       error: error.message
     });
   }
 };
 
-// 根據員工ID獲取薪資
+// Get salaries by staff ID
 const getSalariesByStaffId = async (req, res) => {
   try {
     const { staff_id } = req.params;
-    console.log(`📥 請求：獲取員工 ID ${staff_id} 的薪資`);
+    console.log(`📥 Request: Get salaries for staff ID ${staff_id}`);
     
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^\d+$/.test(staff_id)) {
       return res.status(400).json({
         success: false,
-        message: '員工 ID 必須是數字'
+        message: 'Staff ID must be numeric'
       });
     }
     
@@ -189,23 +189,23 @@ const getSalariesByStaffId = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `未找到員工 ID ${staff_id} 的薪資記錄`
+        message: `No salary records found for staff ID ${staff_id}`
       });
     }
     
-    console.log(`✅ 成功獲取員工 ID ${staff_id} 的薪資，共 ${result.rows.length} 筆`);
+    console.log(`✅ Successfully retrieved salary for staff ID ${staff_id}, total ${result.rows.length} records`);
     
     res.json({
       success: true,
-      message: '成功獲取員工薪資資料',
+      message: 'Successfully retrieved staff salary data',
       data: result.rows,
       count: result.rows.length
     });
   } catch (error) {
-    console.error('❌ 獲取員工薪資錯誤:', error);
+    console.error('❌ Error retrieving staff salary:', error);
     res.status(500).json({
       success: false,
-      message: '獲取員工薪資資料失敗',
+      message: 'Failed to retrieve staff salary data',
       error: error.message
     });
   }
@@ -214,14 +214,14 @@ const getSalariesByStaffId = async (req, res) => {
 const createSalary = async (req, res) => {
   try {
     const salaryData = req.body;
-    console.log('📥 請求：創建新薪資', salaryData);
+    console.log('📥 Request: Create new salary', salaryData);
     
     // Remove salary_id from validation since it's auto-generated
     const errors = validateSalaryData(salaryData, false, true); // true = skip salary_id check
     if (errors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '薪資資料驗證失敗',
+        message: 'Salary data validation failed',
         errors
       });
     }
@@ -231,7 +231,7 @@ const createSalary = async (req, res) => {
     if (existingStaffResult.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '該員工已有薪資記錄'
+        message: 'This staff member already has a salary record'
       });
     }
     
@@ -270,18 +270,18 @@ const createSalary = async (req, res) => {
       salaryData.bank_name || null
     ]);
     
-    console.log(`✅ 成功創建薪資 ID ${result.rows[0].salary_id}`);
+    console.log(`✅ Successfully created salary ID ${result.rows[0].salary_id}`);
     
     res.status(201).json({
       success: true,
-      message: '薪資創建成功',
+      message: 'Salary created successfully',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 創建薪資錯誤:', error);
+    console.error('❌ Error creating salary:', error);
     res.status(500).json({
       success: false,
-      message: '創建薪資失敗',
+      message: 'Failed to create salary',
       error: error.message
     });
   }
@@ -291,13 +291,13 @@ const updateSalary = async (req, res) => {
   try {
     const { salary_id } = req.params;
     const salaryData = req.body;
-    console.log(`📥 請求：更新薪資 ID ${salary_id}`, salaryData);
+    console.log(`📥 Request: Update salary ID ${salary_id}`, salaryData);
     
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^S1\d{3}$/.test(salary_id)) {
       return res.status(400).json({
         success: false,
-        message: '薪資 ID 格式不正確，應為 S1xxx 格式'
+        message: 'Salary ID format is incorrect, should be S1xxx format'
       });
     }
     
@@ -305,7 +305,7 @@ const updateSalary = async (req, res) => {
     if (errors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '薪資資料驗證失敗',
+        message: 'Salary data validation failed',
         errors
       });
     }
@@ -334,22 +334,22 @@ const updateSalary = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '未找到該薪資記錄'
+        message: 'Salary record not found'
       });
     }
     
-    console.log(`✅ 成功更新薪資 ID ${salary_id}`);
+    console.log(`✅ Successfully updated salary ID ${salary_id}`);
     
     res.json({
       success: true,
-      message: '薪資更新成功',
+      message: 'Salary updated successfully',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 更新薪資錯誤:', error);
+    console.error('❌ Error updating salary:', error);
     res.status(500).json({
       success: false,
-      message: '更新薪資失敗',
+      message: 'Failed to update salary',
       error: error.message
     });
   }
@@ -358,13 +358,13 @@ const updateSalary = async (req, res) => {
 const deleteSalary = async (req, res) => {
   try {
     const { salary_id } = req.params;
-    console.log(`📥 請求：刪除薪資 ID ${salary_id}`);
+    console.log(`📥 Request: Delete salary ID ${salary_id}`);
     
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^S1\d{3}$/.test(salary_id)) {
       return res.status(400).json({
         success: false,
-        message: '薪資 ID 格式不正確，應為 S1xxx 格式'
+        message: 'Salary ID format is incorrect, should be S1xxx format'
       });
     }
     
@@ -373,28 +373,28 @@ const deleteSalary = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '未找到該薪資記錄'
+        message: 'Salary record not found'
       });
     }
     
-    console.log(`✅ 成功刪除薪資 ID ${salary_id}`);
+    console.log(`✅ Successfully deleted salary ID ${salary_id}`);
     
     res.json({
       success: true,
-      message: '薪資刪除成功',
+      message: 'Salary deleted successfully',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 刪除薪資錯誤:', error);
+    console.error('❌ Error deleting salary:', error);
     res.status(500).json({
       success: false,
-      message: '刪除薪資失敗',
+      message: 'Failed to delete salary',
       error: error.message
     });
   }
 };
 
-// 保留原有的 staffCheck 函數但重新命名以避免混淆
+// Keep original staffCheck function but rename to avoid confusion
 const staffCheck = getSalariesByStaffId;
 
 module.exports = {

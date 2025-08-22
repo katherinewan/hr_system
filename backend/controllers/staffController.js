@@ -1,13 +1,13 @@
-// controllers/staffController.js - 完整版員工控制器（使用現有 User 模型）
+// controllers/staffController.js - Complete staff controller (using existing User model)
 const { pool } = require('../config/database');
 const { authMiddleware } = require('../middleware/auth');
 
-console.log('📋 載入員工控制器...');
+console.log('📋 Loading staff controller...');
 
-// 獲取所有員工
+// Get all staff
 const getAllStaff = async (req, res) => {
   try {
-    console.log('📥 請求：獲取所有員工');
+    console.log('📥 Request: Get all staff');
     
     const result = await pool.query(`
       SELECT 
@@ -27,35 +27,35 @@ const getAllStaff = async (req, res) => {
       ORDER BY staff_id
     `);
     
-    console.log(`✅ 成功檢索 ${result.rows.length} 名員工`);
+    console.log(`✅ Successfully retrieved ${result.rows.length} staff members`);
     
     res.json({
       success: true,
-      message: `成功檢索 ${result.rows.length} 筆員工記錄`,
+      message: `Successfully retrieved ${result.rows.length} staff records`,
       data: result.rows,
       count: result.rows.length
     });
   } catch (error) {
-    console.error('❌ 獲取員工列表錯誤:', error);
+    console.error('❌ Error retrieving staff list:', error);
     res.status(500).json({
       success: false,
-      message: '無法檢索員工資料',
+      message: 'Unable to retrieve staff data',
       error: error.message
     });
   }
 };
 
-// 根據 ID 獲取員工
+// Get staff by ID
 const getStaffById = async (req, res) => {
   try {
     const { staff_id } = req.params;
-    console.log(`📥 請求：獲取員工 ID ${staff_id}`);
+    console.log(`📥 Request: Get staff ID ${staff_id}`);
     
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^\d+$/.test(staff_id)) {
       return res.status(400).json({
         success: false,
-        message: '員工 ID 必須是數字'
+        message: 'Staff ID must be numeric'
       });
     }
     
@@ -80,38 +80,38 @@ const getStaffById = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到員工 ID ${staff_id}`
+        message: `Staff ID ${staff_id} not found`
       });
     }
     
-    console.log(`✅ 找到員工 ID ${staff_id} 資料`);
+    console.log(`✅ Found staff ID ${staff_id} data`);
     
     res.json({
       success: true,
-      message: `成功檢索員工 ${staff_id} 資料`,
+      message: `Successfully retrieved staff ${staff_id} data`,
       data: result.rows[0],
       staff_id: staff_id.trim()
     });
   } catch (error) {
-    console.error('❌ 獲取員工錯誤:', error);
+    console.error('❌ Error retrieving staff:', error);
     res.status(500).json({
       success: false,
-      message: '無法檢索員工資料',
+      message: 'Unable to retrieve staff data',
       error: error.message
     });
   }
 };
 
-// 根據姓名搜尋員工
+// Search staff by name
 const searchStaffByName = async (req, res) => {
   try {
     const { name } = req.query;
-    console.log(`📥 請求：搜尋包含 "${name}" 的員工姓名`);
+    console.log(`📥 Request: Search for staff names containing "${name}"`);
     
     if (!name || name.trim() === '') {
       return res.status(400).json({
         success: false,
-        message: '請提供搜尋姓名'
+        message: 'Please provide a search name'
       });
     }
     
@@ -135,26 +135,26 @@ const searchStaffByName = async (req, res) => {
       ORDER BY staff_id
     `, [`%${name.trim()}%`]);
     
-    console.log(`✅ 找到 ${result.rows.length} 名匹配的員工`);
+    console.log(`✅ Found ${result.rows.length} matching staff members`);
     
     res.json({
       success: true,
-      message: `找到 ${result.rows.length} 名員工`,
+      message: `Found ${result.rows.length} staff members`,
       data: result.rows,
       count: result.rows.length,
       searchTerm: name.trim()
     });
   } catch (error) {
-    console.error('❌ 搜尋員工錯誤:', error);
+    console.error('❌ Error searching staff:', error);
     res.status(500).json({
       success: false,
-      message: '員工搜尋失敗',
+      message: 'Staff search failed',
       error: error.message
     });
   }
 };
 
-// 新增員工
+// Create staff
 const createStaff = async (req, res) => {
   try {
     const {
@@ -172,43 +172,43 @@ const createStaff = async (req, res) => {
       position_id
     } = req.body;
 
-    console.log('📥 請求：新增員工', { name, email });
+    console.log('📥 Request: Create staff', { name, email });
 
-    // 驗證必填欄位
+    // Validate required fields
     if (!name || !email || !phone_number || !age || !hire_date) {
       return res.status(400).json({
         success: false,
-        message: '請填寫所有必填欄位：姓名、電子郵件、電話號碼、年齡、入職日期'
+        message: 'Please fill in all required fields: name, email, phone number, age, hire date'
       });
     }
 
-    // 驗證電子郵件格式
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: '無效的電子郵件格式'
+        message: 'Invalid email format'
       });
     }
 
-    // 驗證年齡
+    // Validate age
     if (age < 1 || age > 120) {
       return res.status(400).json({
         success: false,
-        message: '年齡必須在 1-120 之間'
+        message: 'Age must be between 1-120'
       });
     }
 
-    // 檢查電子郵件是否已存在
+    // Check if email already exists
     const existingStaff = await pool.query('SELECT staff_id FROM staff WHERE email = $1', [email]);
     if (existingStaff.rows.length > 0) {
       return res.status(409).json({
         success: false,
-        message: '此電子郵件地址已被使用'
+        message: 'This email address is already in use'
       });
     }
 
-    // 插入新員工到資料庫
+    // Insert new staff into database
     const result = await pool.query(`
     INSERT INTO staff (
       staff_id, name, nickname, gender, age, hire_date, email, address, 
@@ -231,27 +231,27 @@ const createStaff = async (req, res) => {
     position_id?.trim() || null
   ]);
 
-    console.log(`✅ 成功新增員工 ID ${result.rows[0].staff_id}`);
+    console.log(`✅ Successfully created staff ID ${result.rows[0].staff_id}`);
 
     res.status(201).json({
       success: true,
-      message: '員工新增成功',
+      message: 'Staff created successfully',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 新增員工錯誤:', error);
+    console.error('❌ Error creating staff:', error);
     res.status(500).json({
       success: false,
-      message: '無法新增員工',
+      message: 'Unable to create staff',
       error: error.message
     });
   }
 };
 
-// 更新員工 - 完全修復版本
+// Update staff - Complete fixed version
 const updateStaff = async (req, res) => {
   try {
-    const { id } = req.params; // 從 URL 獲取 staff_id
+    const { id } = req.params; // Get staff_id from URL
     const {
       name,
       nickname,
@@ -264,53 +264,53 @@ const updateStaff = async (req, res) => {
       emer_phone,
       emer_name,
       position_id
-    } = req.body; // 不再嘗試獲取 staff_id
+    } = req.body; // No longer attempt to get staff_id
 
-    console.log(`📥 請求：更新員工 ID ${id}`, { name, email });
+    console.log(`📥 Request: Update staff ID ${id}`, { name, email });
 
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^\d+$/.test(id)) {
       return res.status(400).json({
         success: false,
-        message: '員工 ID 必須是數字'
+        message: 'Staff ID must be numeric'
       });
     }
 
-    // 驗證必填欄位
+    // Validate required fields
     if (!name || !email || !phone_number || !age || !hire_date) {
       return res.status(400).json({
         success: false,
-        message: '請填寫所有必填欄位：姓名、電子郵件、電話號碼、年齡、入職日期'
+        message: 'Please fill in all required fields: name, email, phone number, age, hire date'
       });
     }
 
-    // 驗證電子郵件格式
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: '無效的電子郵件格式'
+        message: 'Invalid email format'
       });
     }
 
-    // 驗證年齡
+    // Validate age
     if (age < 1 || age > 120) {
       return res.status(400).json({
         success: false,
-        message: '年齡必須在 1-120 之間'
+        message: 'Age must be between 1-120'
       });
     }
 
-    // 檢查員工是否存在
+    // Check if staff exists
     const existingStaff = await pool.query('SELECT staff_id FROM staff WHERE staff_id = $1', [parseInt(id)]);
     if (existingStaff.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到員工 ID ${id}`
+        message: `Staff ID ${id} not found`
       });
     }
 
-    // 檢查電子郵件是否被其他員工使用
+    // Check if email is used by other staff
     const emailCheck = await pool.query(
       'SELECT staff_id FROM staff WHERE email = $1 AND staff_id != $2', 
       [email, parseInt(id)]
@@ -318,11 +318,11 @@ const updateStaff = async (req, res) => {
     if (emailCheck.rows.length > 0) {
       return res.status(409).json({
         success: false,
-        message: '此電子郵件地址已被其他員工使用'
+        message: 'This email address is already used by another staff member'
       });
     }
 
-    // 更新員工資料
+    // Update staff data
     const result = await pool.query(`
       UPDATE staff SET 
         name = $1,
@@ -350,79 +350,79 @@ const updateStaff = async (req, res) => {
       emer_phone ? String(emer_phone).trim() : null,
       emer_name ? String(emer_name).trim() : null,
       position_id ? String(position_id).trim() : null,
-      parseInt(id) // 使用 URL 參數中的 id
+      parseInt(id) // Use id from URL parameters
     ]);
 
-    console.log(`✅ 成功更新員工 ID ${id}`);
+    console.log(`✅ Successfully updated staff ID ${id}`);
 
     res.json({
       success: true,
-      message: '員工資料更新成功',
+      message: 'Staff data updated successfully',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 更新員工錯誤:', error);
+    console.error('❌ Error updating staff:', error);
     res.status(500).json({
       success: false,
-      message: '無法更新員工資料',
+      message: 'Unable to update staff data',
       error: error.message
     });
   }
 };
 
-// 刪除員工
+// Delete staff
 const deleteStaff = async (req, res) => {
   try {
     const { staff_id } = req.params;
-    console.log(`📥 請求：刪除員工 ID ${staff_id}`);
+    console.log(`📥 Request: Delete staff ID ${staff_id}`);
 
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^\d+$/.test(staff_id)) {
       return res.status(400).json({
         success: false,
-        message: '員工 ID 必須是數字'
+        message: 'Staff ID must be numeric'
       });
     }
 
-    // 檢查員工是否存在
+    // Check if staff exists
     const existingStaff = await pool.query('SELECT name FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
     if (existingStaff.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到員工 ID ${staff_id}`
+        message: `Staff ID ${staff_id} not found`
       });
     }
 
     const staffName = existingStaff.rows[0].name;
 
-    // 刪除員工
+    // Delete staff
     await pool.query('DELETE FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
 
-    console.log(`✅ 成功刪除員工 ID ${staff_id} (${staffName})`);
+    console.log(`✅ Successfully deleted staff ID ${staff_id} (${staffName})`);
 
     res.json({
       success: true,
-      message: `員工 ${staffName} (ID: ${staff_id}) 已成功刪除`
+      message: `Staff ${staffName} (ID: ${staff_id}) has been successfully deleted`
     });
   } catch (error) {
-    console.error('❌ 刪除員工錯誤:', error);
+    console.error('❌ Error deleting staff:', error);
     res.status(500).json({
       success: false,
-      message: '無法刪除員工',
+      message: 'Unable to delete staff',
       error: error.message
     });
   }
 };
 
-// ============ 員工個人資料相關功能 (需要認證) ============
+// ============ Staff Profile Related Functions (requires authentication) ============
 
-// 獲取登入員工的個人資料
+// Get logged-in staff profile
 const getStaffProfile = async (req, res) => {
   try {
-    const staffId = req.staff.staffId; // 來自 authMiddleware
-    console.log(`📥 請求：獲取員工個人資料 ID ${staffId}`);
+    const staffId = req.staff.staffId; // From authMiddleware
+    console.log(`📥 Request: Get staff profile ID ${staffId}`);
 
-    // 獲取完整的員工資料和職位資訊
+    // Get complete staff data and position information
     const staffQuery = `
       SELECT 
         s.staff_id,
@@ -450,13 +450,13 @@ const getStaffProfile = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '找不到員工個人資料'
+        message: 'Staff profile not found'
       });
     }
 
     const staffProfile = result.rows[0];
 
-    // 格式化回應資料
+    // Format response data
     const profileData = {
       staffId: staffProfile.staff_id,
       personalInfo: {
@@ -481,27 +481,27 @@ const getStaffProfile = async (req, res) => {
       }
     };
 
-    console.log(`✅ 成功獲取員工資料: ${staffProfile.name}`);
+    console.log(`✅ Successfully retrieved staff data: ${staffProfile.name}`);
 
     res.json({
       success: true,
-      message: '員工個人資料檢索成功',
+      message: 'Staff profile retrieved successfully',
       data: profileData
     });
 
   } catch (error) {
-    console.error('❌ 獲取員工個人資料錯誤:', error);
+    console.error('❌ Error retrieving staff profile:', error);
     res.status(500).json({
       success: false,
-      message: '檢索個人資料時發生內部伺服器錯誤'
+      message: 'Internal server error occurred while retrieving profile'
     });
   }
 };
 
-// 更新員工個人資料 (限制可編輯欄位)
+// Update staff profile (limited editable fields)
 const updateStaffProfile = async (req, res) => {
   try {
-    const staffId = req.staff.staffId; // 來自 authMiddleware
+    const staffId = req.staff.staffId; // From authMiddleware
     const { 
       nickname, 
       phoneNumber, 
@@ -510,17 +510,17 @@ const updateStaffProfile = async (req, res) => {
       emergencyContactPhone 
     } = req.body;
 
-    console.log(`📥 請求：更新員工個人資料 ID ${staffId}`);
+    console.log(`📥 Request: Update staff profile ID ${staffId}`);
 
-    // 驗證輸入
+    // Validate input
     if (!nickname && !phoneNumber && !address && !emergencyContactName && !emergencyContactPhone) {
       return res.status(400).json({
         success: false,
-        message: '至少需要提供一個欄位進行更新'
+        message: 'At least one field is required for update'
       });
     }
 
-    // 建立動態更新查詢
+    // Build dynamic update query
     const updateFields = [];
     const values = [];
     let paramCounter = 1;
@@ -546,7 +546,7 @@ const updateStaffProfile = async (req, res) => {
       values.push(emergencyContactPhone);
     }
 
-    values.push(staffId); // 添加 staff_id 用於 WHERE 條件
+    values.push(staffId); // Add staff_id for WHERE condition
 
     const updateQuery = `
       UPDATE staff 
@@ -560,15 +560,15 @@ const updateStaffProfile = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '找不到員工或未進行任何變更'
+        message: 'Staff not found or no changes made'
       });
     }
 
-    console.log(`✅ 成功更新員工個人資料 ID ${staffId}`);
+    console.log(`✅ Successfully updated staff profile ID ${staffId}`);
 
     res.json({
       success: true,
-      message: '個人資料更新成功',
+      message: 'Profile updated successfully',
       data: {
         staffId: result.rows[0].staff_id,
         updatedFields: {
@@ -582,21 +582,21 @@ const updateStaffProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ 更新員工個人資料錯誤:', error);
+    console.error('❌ Error updating staff profile:', error);
     res.status(500).json({
       success: false,
-      message: '更新個人資料時發生內部伺服器錯誤'
+      message: 'Internal server error occurred while updating profile'
     });
   }
 };
 
-// 獲取工作統計摘要
+// Get work summary
 const getWorkSummary = async (req, res) => {
   try {
-    const staffId = req.staff.staffId; // 來自 authMiddleware
-    console.log(`📥 請求：獲取工作統計摘要 ID ${staffId}`);
+    const staffId = req.staff.staffId; // From authMiddleware
+    console.log(`📥 Request: Get work summary ID ${staffId}`);
 
-    // 獲取工作統計摘要
+    // Get work summary statistics
     const summaryQuery = `
       SELECT 
         COUNT(*) as total_work_days,
@@ -610,7 +610,7 @@ const getWorkSummary = async (req, res) => {
 
     const summaryResult = await pool.query(summaryQuery, [staffId]);
     
-    // 獲取入職日期來計算服務年限
+    // Get hire date to calculate years of service
     const hireQuery = `SELECT hire_date FROM staff WHERE staff_id = $1`;
     const hireResult = await pool.query(hireQuery, [staffId]);
 
@@ -632,19 +632,19 @@ const getWorkSummary = async (req, res) => {
       }
     };
 
-    console.log(`✅ 成功獲取工作統計摘要 ID ${staffId}`);
+    console.log(`✅ Successfully retrieved work summary ID ${staffId}`);
 
     res.json({
       success: true,
-      message: '工作統計摘要檢索成功',
+      message: 'Work summary retrieved successfully',
       data: workSummary
     });
 
   } catch (error) {
-    console.error('❌ 獲取工作統計摘要錯誤:', error);
+    console.error('❌ Error retrieving work summary:', error);
     res.status(500).json({
       success: false,
-      message: '檢索工作統計摘要時發生內部伺服器錯誤'
+      message: 'Internal server error occurred while retrieving work summary'
     });
   }
 };

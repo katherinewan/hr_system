@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-console.log('🛣️  載入員工帳號路由...');
+console.log('🛣️  Loading user account routes...');
 
 const {
   getAllUsers,
@@ -17,7 +17,7 @@ const {
 const logRequest = (req, res, next) => {
   console.log(`🌐 ${req.method} ${req.originalUrl} - ${new Date().toLocaleTimeString()}`);
   if (req.body && Object.keys(req.body).length > 0) {
-    // 不要記錄密碼等敏感信息
+    // Don't log sensitive information like passwords
     const safeBody = { ...req.body };
     if (safeBody.password) safeBody.password = '***';
     if (safeBody.old_password) safeBody.old_password = '***';
@@ -27,40 +27,40 @@ const logRequest = (req, res, next) => {
   next();
 };
 
-// 應用記錄中間件到所有路由
+// Apply logging middleware to all routes
 router.use(logRequest);
 
-// 測試路由 - 放在最前面
+// Test route - place at the beginning
 router.get('/test/ping', (req, res) => {
   res.json({
     success: true,
-    message: '員工帳號路由運作正常',
+    message: 'User account routes are working properly',
     timestamp: new Date().toISOString()
   });
 });
 
-// 創建新用戶路由 - 放在搜尋路由之前
+// Create new user route - place before search routes
 router.post('/', createUser);
 
-// 搜尋路由 - 放在具體路徑之前
+// Search routes - place before specific paths
 router.get('/search', searchUsersByName);
 
-// 更改密碼路由
+// Change password route
 router.put('/change-password', changePassword);
 
-// 更新用戶角色路由
+// Update user role route
 router.put('/:user_id/role', updateUserRole);
 
-// 切換用戶鎖定狀態路由
+// Toggle user lock status route
 router.put('/:user_id/toggle-lock', toggleUserLock);
 
-// 更新用戶資料路由 - 支持前端的編輯功能
+// Update user data route - supports frontend edit functionality
 router.put('/:user_id', updateUser);
 
-// 根據ID獲取特定用戶 - 放在通用路由之前
+// Get specific user by ID - place before generic routes
 router.get('/:user_id', searchUsersById);
 
-// 獲取所有用戶 - 放在最後
+// Get all users - place at the end
 router.get('/', getAllUsers);
 
 module.exports = router;

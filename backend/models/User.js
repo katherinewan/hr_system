@@ -1,10 +1,10 @@
-// models/User.js - 用戶模型
+// models/User.js - User model
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 
 class User {
-  // 根據 staff_id 查找用戶
+  // Find user by staff_id
   static async findByStaffId(staff_id) {
     try {
       const result = await pool.query(`
@@ -25,12 +25,12 @@ class User {
       
       return result.rows[0] || null;
     } catch (error) {
-      console.error('查找用戶錯誤:', error);
+      console.error('Error finding user:', error);
       throw error;
     }
   }
 
-  // 根據 user_id 查找用戶
+  // Find user by user_id
   static async findById(user_id) {
     try {
       const result = await pool.query(`
@@ -50,43 +50,43 @@ class User {
       
       return result.rows[0] || null;
     } catch (error) {
-      console.error('根據ID查找用戶錯誤:', error);
+      console.error('Error finding user by ID:', error);
       throw error;
     }
   }
 
-  // 驗證密碼
+  // Validate password
   static async validatePassword(inputPassword, storedPassword) {
     try {
-      // 檢查是否為 bcrypt 哈希格式
+      // Check if it's bcrypt hash format
       if (storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2a$')) {
-        // 使用 bcrypt 驗證
+        // Use bcrypt validation
         return await bcrypt.compare(inputPassword, storedPassword);
       } else {
-        // ⚠️ 臨時方案：直接比較明文（僅開發環境）
-        console.warn('⚠️ 警告：使用明文密碼比較，僅適用於開發環境！');
+        // ⚠️ Temporary solution: direct plaintext comparison (development environment only)
+        console.warn('⚠️ Warning: Using plaintext password comparison, only suitable for development environment');
         
-        // 處理你資料庫中的格式
+        // Handle format in your database
         if (storedPassword === 'TestPassword123!') {
           return inputPassword === 'TestPassword123!';
         }
         
-        // 處理 hashed_password_xxx 格式
+        // Handle hashed_password_xxx format
         if (storedPassword.startsWith('hashed_password_')) {
           const number = storedPassword.replace('hashed_password_', '');
           return inputPassword === number || inputPassword === storedPassword;
         }
         
-        // 直接比較
+        // Direct comparison
         return inputPassword === storedPassword;
       }
     } catch (error) {
-      console.error('密碼驗證錯誤:', error);
+      console.error('Password validation error:', error);
       return false;
     }
   }
 
-  // 生成 JWT Token - 添加缺少的方法
+  // Generate JWT Token - adding missing method
   static generateToken(user) {
     try {
       const payload = {
@@ -102,22 +102,22 @@ class User {
       
       return jwt.sign(payload, secret, options);
     } catch (error) {
-      console.error('生成token錯誤:', error);
+      console.error('Error generating token:', error);
       throw error;
     }
   }
 
-  // 驗證 JWT Token
+  // Verify JWT Token
   static verifyToken(token) {
     try {
       return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     } catch (error) {
-      console.error('驗證token錯誤:', error);
+      console.error('Error verifying token:', error);
       return null;
     }
   }
 
-  // 增加失敗嘗試次數
+  // Increment failed login attempts
   static async incrementFailedAttempts(staff_id) {
     try {
       const result = await pool.query(`
@@ -134,12 +134,12 @@ class User {
       
       return result.rows[0];
     } catch (error) {
-      console.error('增加失敗嘗試次數錯誤:', error);
+      console.error('Error incrementing failed attempts:', error);
       throw error;
     }
   }
 
-  // 重置失敗嘗試次數
+  // Reset failed login attempts
   static async resetFailedAttempts(staff_id) {
     try {
       await pool.query(`
@@ -150,12 +150,12 @@ class User {
         WHERE staff_id = $1
       `, [staff_id]);
     } catch (error) {
-      console.error('重置失敗嘗試次數錯誤:', error);
+      console.error('Error resetting failed attempts:', error);
       throw error;
     }
   }
 
-  // 更新最後登入時間
+  // Update last login time
   static async updateLastLogin(staff_id) {
     try {
       await pool.query(`
@@ -164,12 +164,12 @@ class User {
         WHERE staff_id = $1
       `, [staff_id]);
     } catch (error) {
-      console.error('更新最後登入時間錯誤:', error);
+      console.error('Error updating last login time:', error);
       throw error;
     }
   }
 
-  // 檢查用戶帳戶是否存在
+  // Check if user account exists
   static async userAccountExists(staff_id) {
     try {
       const result = await pool.query(
@@ -178,15 +178,15 @@ class User {
       );
       return result.rows.length > 0;
     } catch (error) {
-      console.error('檢查用戶帳戶錯誤:', error);
+      console.error('Error checking user account:', error);
       throw error;
     }
   }
 
-  // 創建新用戶
+  // Create new user
   static async create({ staff_id, password, role = 'Employee' }) {
     try {
-      // 檢查員工是否存在
+      // Check if staff exists
       const staffExists = await pool.query(
         'SELECT staff_id FROM staff WHERE staff_id = $1',
         [staff_id]
@@ -196,17 +196,17 @@ class User {
         throw new Error('Staff ID does not exist');
       }
 
-      // 檢查用戶帳戶是否已存在
+      // Check if user account already exists
       const userExists = await this.userAccountExists(staff_id);
       if (userExists) {
         throw new Error('User account already exists');
       }
 
-      // 加密密碼
+      // Hash password
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // 創建用戶帳戶
+      // Create user account
       const result = await pool.query(`
         INSERT INTO user_accounts (staff_id, password, role, failed_login_attempts, account_locked)
         VALUES ($1, $2, $3, 0, false)
@@ -215,12 +215,12 @@ class User {
 
       return result.rows[0];
     } catch (error) {
-      console.error('創建用戶錯誤:', error);
+      console.error('Error creating user:', error);
       throw error;
     }
   }
 
-  // 修改密碼
+  // Change password
   static async changePassword(staff_id, newPassword) {
     try {
       const saltRounds = 10;
@@ -231,12 +231,12 @@ class User {
         [hashedPassword, staff_id]
       );
     } catch (error) {
-      console.error('修改密碼錯誤:', error);
+      console.error('Error changing password:', error);
       throw error;
     }
   }
 
-  // 解鎖帳戶
+  // Unlock account
   static async unlockAccount(staff_id) {
     try {
       await pool.query(`
@@ -247,12 +247,12 @@ class User {
         WHERE staff_id = $1
       `, [staff_id]);
     } catch (error) {
-      console.error('解鎖帳戶錯誤:', error);
+      console.error('Error unlocking account:', error);
       throw error;
     }
   }
 
-  // 獲取所有用戶
+  // Get all users
   static async getAllUsers() {
     try {
       const result = await pool.query(`
@@ -272,23 +272,23 @@ class User {
       
       return result.rows;
     } catch (error) {
-      console.error('獲取所有用戶錯誤:', error);
+      console.error('Error getting all users:', error);
       throw error;
     }
   }
 
-  // 密碼強度驗證
+  // Password strength validation
   static validatePasswordStrength(password) {
     if (!password || password.length < 6) {
       return {
         valid: false,
-        message: '密碼長度至少需要6個字符'
+        message: 'Password must be at least 6 characters long'
       };
     }
     
     return {
       valid: true,
-      message: '密碼強度有效'
+      message: 'Password strength is valid'
     };
   }
 }

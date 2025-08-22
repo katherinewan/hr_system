@@ -1,43 +1,43 @@
-// app.js - 主應用程式
+// app.js - Main application
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-// 匯入資料庫配置
+// Import database configuration
 const { pool, testConnection } = require('./config/database');
 
-// 建立 Express 應用程式
+// Create Express application
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({
   origin: [
-    'http://localhost:3000',  // React 開發伺服器
-    'http://localhost:3001',  // 備用端口
+    'http://localhost:3000',  // React development server
+    'http://localhost:3001',  // Backup port
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
-    'https://hr-system-tau.vercel.app' // 這裡放你實際的 Vercel 網址
+    'https://hr-system-tau.vercel.app' // Replace with your actual Vercel URL
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 基本中間件
+// Basic middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 請求日志中間件
+// Request logging middleware
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
   console.log(`${timestamp} - ${req.method} ${req.path}`);
   next();
 });
 
-// 主頁路由
+// Home route
 app.get('/', (req, res) => {
   res.json({
-    message: '🎉 HR 管理系統 API 伺服器',
+    message: 'HR Management System API Server',
     version: '1.0.0',
     status: 'running',
     timestamp: new Date().toISOString(),
@@ -45,14 +45,14 @@ app.get('/', (req, res) => {
       auth: '/api/auth/*',
       staff: '/api/staff/*',
       users: '/api/users/*',
-      holidays: '/api/holidays/*',  // 🆕 新增假期管理端點
+      holidays: '/api/holidays/*',  // New holiday management endpoint
       health: '/health',
       dbTest: '/api/db-test'
     }
   });
 });
 
-// 健康檢查路由（包含資料庫狀態）
+// Health check route (including database status)
 app.get('/health', async (req, res) => {
   try {
     const dbStatus = await testConnection();
@@ -75,17 +75,17 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// 資料庫測試路由 - 🆕 增加假期相關表的檢查
+// Database test route - Added holiday-related table checks
 app.get('/api/db-test', async (req, res) => {
   try {
-    console.log('🔍 測試資料庫連線...');
+    console.log('Testing database connection...');
     const result = await pool.query('SELECT NOW() as server_time, version() as pg_version');
     
-    // 測試基本表
+    // Test basic tables
     const userCountResult = await pool.query('SELECT COUNT(*) as user_count FROM user_accounts');
     const staffCountResult = await pool.query('SELECT COUNT(*) as staff_count FROM staff');
     
-    // 🆕 測試假期相關表
+    // Test holiday-related tables
     let holidayTables = {};
     try {
       const leaveQuotaResult = await pool.query('SELECT COUNT(*) as quota_count FROM leave');
@@ -98,13 +98,13 @@ app.get('/api/db-test', async (req, res) => {
         leave_history: leaveHistoryResult.rows[0].history_count
       };
     } catch (holidayError) {
-      console.warn('⚠️ 假期表檢查失敗:', holidayError.message);
-      holidayTables = { error: '假期表尚未創建或無權限訪問' };
+      console.warn('Holiday table check failed:', holidayError.message);
+      holidayTables = { error: 'Holiday tables not created or no access permission' };
     }
     
     res.json({
       success: true,
-      message: '資料庫連線正常',
+      message: 'Database connection normal',
       data: {
         server_time: result.rows[0].server_time,
         postgresql_version: result.rows[0].pg_version,
@@ -116,93 +116,93 @@ app.get('/api/db-test', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ 資料庫測試錯誤:', error);
+    console.error('Database test error:', error);
     res.status(500).json({
       success: false,
-      message: '資料庫連線失敗',
+      message: 'Database connection failed',
       error: error.message
     });
   }
 });
 
-// ===== 載入路由 =====
+// ===== Load Routes =====
 
-// 載入認證路由 - 最重要！
+// Load authentication routes - Most important!
 try {
   const authRoutes = require('./routes/authRoutes');
   app.use('/api/auth', authRoutes);
-  console.log('✅ 認證路由載入成功');
+  console.log('Authentication routes loaded successfully');
 } catch (error) {
-  console.error('❌ 認證路由載入失敗:', error.message);
+  console.error('Authentication routes loading failed:', error.message);
 }
 
-// 載入員工路由
+// Load staff routes
 try {
   const staffRoutes = require('./routes/staffRoutes');
   app.use('/api/staff', staffRoutes);
-  console.log('✅ 員工路由載入成功');
+  console.log('Staff routes loaded successfully');
 } catch (error) {
-  console.warn('⚠️ 員工路由載入失敗:', error.message);
+  console.warn('Staff routes loading failed:', error.message);
 }
 
-// 載入員工帳號路由
+// Load user account routes
 try {
   const userRoutes = require('./routes/userRoutes');
   app.use('/api/users', userRoutes);
-  console.log('✅ 用戶路由載入成功');
+  console.log('User routes loaded successfully');
 } catch (error) {
-  console.warn('⚠️ 用戶路由載入失敗:', error.message);
+  console.warn('User routes loading failed:', error.message);
 }
 
-// 🆕 載入假期管理路由 - 重要新增！
+// Load holiday management routes - Important addition!
 try {
-  // 先嘗試載入 holidayRoutes.js
+  // First try to load holidayRoutes.js
   let holidayRoutes;
   try {
     holidayRoutes = require('./routes/holidayRoutes');
-    console.log('✅ 假期管理路由載入成功 (holidayRoutes.js)');
+    console.log('Holiday management routes loaded successfully (holidayRoutes.js)');
   } catch (holidayError) {
-    // 如果 holidayRoutes.js 不存在，嘗試載入 leaveRoutes.js
+    // If holidayRoutes.js doesn't exist, try to load leaveRoutes.js
     try {
       holidayRoutes = require('./routes/leaveRoutes');
-      console.log('✅ 假期管理路由載入成功 (leaveRoutes.js)');
+      console.log('Holiday management routes loaded successfully (leaveRoutes.js)');
     } catch (leaveError) {
       throw new Error('Neither holidayRoutes.js nor leaveRoutes.js found');
     }
   }
   
   app.use('/api/holidays', holidayRoutes);
-  console.log('✅ 假期管理路由掛載到 /api/holidays');
+  console.log('Holiday management routes mounted to /api/holidays');
   
 } catch (error) {
-  console.error('❌ 假期管理路由載入失敗:', error.message);
-  console.error('請確保 ./routes/holidayRoutes.js 或 ./routes/leaveRoutes.js 文件存在');
+  console.error('Holiday management routes loading failed:', error.message);
+  console.error('Please ensure ./routes/holidayRoutes.js or ./routes/leaveRoutes.js file exists');
 }
 
-// 載入其他路由（可選）
+// Load other routes (optional)
 const optionalRoutes = [
-  { path: './routes/attendRoutes', mount: '/api/attendance', name: '出勤路由' },
-  { path: './routes/positionRoutes', mount: '/api/positions', name: '職位路由' },
-  { path: './routes/departRoutes', mount: '/api/departments', name: '部門路由' },
-  { path: './routes/salaryRoutes', mount: '/api/salaries', name: '薪資路由' },
-  { path: './routes/leaveRoutes', mount: '/api/leave', name: '休假路由' }
+  { path: './routes/attendRoutes', mount: '/api/attendance', name: 'Attendance routes' },
+  { path: './routes/positionRoutes', mount: '/api/positions', name: 'Position routes' },
+  { path: './routes/departRoutes', mount: '/api/departments', name: 'Department routes' },
+  { path: './routes/salaryRoutes', mount: '/api/salaries', name: 'Salary routes' },
+  { path: './routes/leaveRoutes', mount: '/api/leave', name: 'Leave routes' }
 ];
 
 optionalRoutes.forEach(route => {
   try {
     const routeModule = require(route.path);
     app.use(route.mount, routeModule);
-    console.log(`✅ ${route.name}載入成功`);
+    console.log(`${route.name} loaded successfully`);
   } catch (error) {
-    console.warn(`⚠️ ${route.name}載入失敗:`, error.message);
+    console.warn(`${route.name} loading failed:`, error.message);
   }
 });
 
-// 測試登入端點
+// Test login endpoint
 app.get('/api/auth/test', (req, res) => {
   res.json({
     success: true,
-    message: '認證路由測試成功',
+    message: 'Authentication route test successful',
     endpoints: {
       login: 'POST /api/auth/login',
       register: 'POST /api/auth/register',
@@ -212,62 +212,62 @@ app.get('/api/auth/test', (req, res) => {
   });
 });
 
-// 🆕 假期管理測試端點
+// Holiday management test endpoint
 app.get('/api/holidays/test', (req, res) => {
   res.json({
     success: true,
-    message: '假期管理路由測試成功',
+    message: 'Holiday management route test successful',
     version: '1.0.0',
     endpoints: {
-      // 配額管理
+      // Quota management
       quotas: {
-        'GET /api/holidays/quotas': '獲取所有員工假期配額',
-        'GET /api/holidays/quotas/:staff_id': '獲取指定員工配額',
-        'POST /api/holidays/quotas': '初始化員工配額',
-        'PUT /api/holidays/quotas/:staff_id': '更新員工配額'
+        'GET /api/holidays/quotas': 'Get all staff leave quotas',
+        'GET /api/holidays/quotas/:staff_id': 'Get specific staff quota',
+        'POST /api/holidays/quotas': 'Initialize staff quota',
+        'PUT /api/holidays/quotas/:staff_id': 'Update staff quota'
       },
-      // 申請管理
+      // Request management
       requests: {
-        'GET /api/holidays/requests': '獲取所有假期申請',
-        'POST /api/holidays/requests': '提交假期申請',
-        'GET /api/holidays/requests/pending': '獲取待審核申請',
-        'PUT /api/holidays/requests/:id/approve': '批准申請',
-        'PUT /api/holidays/requests/:id/reject': '拒絕申請',
-        'PUT /api/holidays/requests/:id/cancel': '取消申請'
+        'GET /api/holidays/requests': 'Get all leave requests',
+        'POST /api/holidays/requests': 'Submit leave request',
+        'GET /api/holidays/requests/pending': 'Get pending requests',
+        'PUT /api/holidays/requests/:id/approve': 'Approve request',
+        'PUT /api/holidays/requests/:id/reject': 'Reject request',
+        'PUT /api/holidays/requests/:id/cancel': 'Cancel request'
       },
-      // 統計報告
+      // Statistical reports
       statistics: {
-        'GET /api/holidays/statistics/overview': '統計概覽',
-        'GET /api/holidays/statistics/by-type': '按類型統計',
-        'GET /api/holidays/statistics/by-department': '按部門統計',
-        'GET /api/holidays/statistics/by-month': '按月份統計'
+        'GET /api/holidays/statistics/overview': 'Statistics overview',
+        'GET /api/holidays/statistics/by-type': 'Statistics by type',
+        'GET /api/holidays/statistics/by-department': 'Statistics by department',
+        'GET /api/holidays/statistics/by-month': 'Statistics by month'
       },
-      // 其他功能
+      // Other functions
       other: {
-        'GET /api/holidays/eligibility': '檢查假期資格',
-        'GET /api/holidays/calendar/:year/:month': '假期日曆',
-        'GET /api/holidays/search/by-date-range': '日期範圍搜索'
+        'GET /api/holidays/eligibility': 'Check leave eligibility',
+        'GET /api/holidays/calendar/:year/:month': 'Holiday calendar',
+        'GET /api/holidays/search/by-date-range': 'Date range search'
       }
     }
   });
 });
 
-// 404 處理 - 🆕 更新可用路由列表
+// 404 handling - Updated available route list
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: '找不到該路由',
+    message: 'Route not found',
     path: req.originalUrl,
     method: req.method,
     availableRoutes: [
       'GET /',
       'GET /health',
       'GET /api/db-test',
-      // 認證路由
+      // Authentication routes
       'POST /api/auth/login',
       'POST /api/auth/register',
       'GET /api/auth/test',
-      // 🆕 假期管理路由
+      // Holiday management routes
       'GET /api/holidays/test',
       'GET /api/holidays/quotas',
       'POST /api/holidays/requests',
@@ -277,35 +277,35 @@ app.use('*', (req, res) => {
   });
 });
 
-// 🆕 假期管理專用錯誤處理中間件
+// Holiday management specific error handling middleware
 app.use('/api/holidays', (err, req, res, next) => {
-  console.error('❌ 假期管理錯誤:', err);
+  console.error('Holiday management error:', err);
   
-  // PostgreSQL 錯誤處理
+  // PostgreSQL error handling
   if (err.code) {
     switch (err.code) {
-      case '23505': // 唯一性約束違反
+      case '23505': // Unique constraint violation
         return res.status(400).json({
           success: false,
-          message: '數據重複，請檢查輸入資料',
+          message: 'Duplicate data, please check input data',
           error_code: 'DUPLICATE_DATA'
         });
-      case '23503': // 外鍵約束違反
+      case '23503': // Foreign key constraint violation
         return res.status(400).json({
           success: false,
-          message: '相關數據不存在，請檢查輸入資料',
+          message: 'Related data does not exist, please check input data',
           error_code: 'FOREIGN_KEY_VIOLATION'
         });
-      case '23514': // 檢查約束違反
+      case '23514': // Check constraint violation
         return res.status(400).json({
           success: false,
-          message: '數據不符合業務規則',
+          message: 'Data does not comply with business rules',
           error_code: 'CHECK_CONSTRAINT_VIOLATION'
         });
       default:
         return res.status(500).json({
           success: false,
-          message: '數據庫操作失敗',
+          message: 'Database operation failed',
           error_code: 'DATABASE_ERROR'
         });
     }
@@ -313,60 +313,44 @@ app.use('/api/holidays', (err, req, res, next) => {
   
   res.status(500).json({
     success: false,
-    message: '假期管理系統錯誤',
-    error: process.env.NODE_ENV === 'development' ? err.message : '內部伺服器錯誤'
+    message: 'Holiday management system error',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
 });
 
-// 一般錯誤處理中間件
+// General error handling middleware
 app.use((err, req, res, next) => {
-  console.error('❌ 伺服器錯誤:', err);
+  console.error('Server error:', err);
   res.status(500).json({
     success: false,
-    message: '伺服器內部錯誤',
+    message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-// 啟動伺服器 - 🆕 更新啟動訊息
+// Start server - Updated startup message
 const startServer = async () => {
-  console.log('🚀 ===== HR 管理系統啟動 =====');
+  console.log('===== HR Management System Starting =====');
   
-  // 測試資料庫連線
+  // Test database connection
   const dbConnected = await testConnection();
   
   app.listen(PORT, () => {
-    console.log(`📡 伺服器運行在: http://localhost:${PORT}`);
-    console.log(`🗄️  資料庫狀態: ${dbConnected ? '✅ 已連線' : '❌ 未連線'}`);
-    console.log(`🕐 啟動時間: ${new Date().toLocaleString()}`);
-    console.log('📋 主要 API 路由:');
-    console.log('   🔐 認證模組:');
-    console.log('      POST   /api/auth/login          - 用戶登入');
-    console.log('      POST   /api/auth/register       - 用戶註冊');
-    console.log('      GET    /api/auth/me             - 獲取當前用戶');
-    console.log('      POST   /api/auth/verify         - 驗證token');
-    console.log('      GET    /api/auth/test           - 測試認證路由');
-    console.log('   🏖️  假期管理模組:');
-    console.log('      GET    /api/holidays/quotas     - 獲取假期配額');
-    console.log('      POST   /api/holidays/requests   - 提交假期申請');
-    console.log('      GET    /api/holidays/requests/pending - 待審核申請');
-    console.log('      GET    /api/holidays/statistics/overview - 統計概覽');
-    console.log('      GET    /api/holidays/test       - 測試假期路由');
-    console.log('   🔧 系統功能:');
-    console.log('      GET    /health                  - 健康檢查');
-    console.log('      GET    /api/db-test             - 資料庫測試');
+    console.log(`Server running on: http://localhost:${PORT}`);
+    console.log(`Database status: ${dbConnected ? 'Connected' : 'Disconnected'}`);
+    console.log(`Start time: ${new Date().toLocaleString()}`);
     console.log('=======================================');
   });
 };
 
-// 啟動
+// Start
 startServer();
 
-// 優雅關閉處理
+// Graceful shutdown handling
 process.on('SIGINT', () => {
-  console.log('\n🔄 正在關閉伺服器...');
+  console.log('\nShutting down server...');
   pool.end(() => {
-    console.log('✅ 資料庫連線池已關閉');
+    console.log('Database connection pool closed');
     process.exit(0);
   });
 });

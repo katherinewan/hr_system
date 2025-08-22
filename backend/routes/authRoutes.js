@@ -1,80 +1,80 @@
-// routes/auth.js - 使用你現有 User 模型的認證路由（配合 staff_id 登入）
+// routes/auth.js - Authentication routes using your existing User model (configured for staff_id login)
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const { pool } = require('../config/database');
 
-console.log('🔐 載入認證路由...');
+console.log('🔐 Loading authentication routes...');
 
-// POST /api/auth/login - 員工登入 (使用 staff_id)
+// POST /api/auth/login - Staff login (using staff_id)
 router.post('/login', async (req, res) => {
   try {
     const { staff_id, password } = req.body;
-    console.log(`🔐 登入嘗試: Staff ID ${staff_id}`);
+    console.log(`🔐 Login attempt: Staff ID ${staff_id}`);
 
-    // 驗證輸入
+    // Validate input
     if (!staff_id || !password) {
       return res.status(400).json({
         success: false,
-        message: '請輸入員工 ID 和密碼'
+        message: 'Please enter staff ID and password'
       });
     }
 
-    // 使用 User 模型查找用戶
+    // Use User model to find user
     const user = await User.findByStaffId(staff_id);
     if (!user) {
-      console.log(`❌ 找不到用戶帳戶: Staff ID ${staff_id}`);
+      console.log(`❌ User account not found: Staff ID ${staff_id}`);
       return res.status(401).json({
         success: false,
-        message: '員工 ID 或密碼錯誤'
+        message: 'Incorrect staff ID or password'
       });
     }
 
-    // 檢查帳戶是否被鎖定
+    // Check if account is locked
     if (user.account_locked) {
-      console.log(`🔒 帳戶被鎖定: Staff ID ${staff_id}`);
+      console.log(`🔒 Account locked: Staff ID ${staff_id}`);
       return res.status(423).json({
         success: false,
-        message: '帳戶已被鎖定，請聯絡 HR 尋求協助'
+        message: 'Account is locked, please contact HR for assistance'
       });
     }
 
-    // 檢查登入失敗次數
+    // Check failed login attempts
     if (user.failed_login_attempts >= 5) {
-      console.log(`⚠️ 登入失敗次數過多: Staff ID ${staff_id}`);
+      console.log(`⚠️ Too many failed login attempts: Staff ID ${staff_id}`);
       return res.status(423).json({
         success: false,
-        message: '登入失敗次數過多，請聯絡 HR 重置帳戶'
+        message: 'Too many failed login attempts, please contact HR to reset account'
       });
     }
 
-    // 使用 User 模型驗證密碼
+    // Use User model to validate password
     const isValidPassword = await User.validatePassword(password, user.password);
 
     if (!isValidPassword) {
-      console.log(`❌ 密碼錯誤: Staff ID ${staff_id}`);
+      console.log(`❌ Incorrect password: Staff ID ${staff_id}`);
       
-      // 使用 User 模型增加失敗登入次數
+      // Use User model to increment failed login attempts
       await User.incrementFailedAttempts(staff_id);
 
       return res.status(401).json({
         success: false,
-        message: '員工 ID 或密碼錯誤'
+        message: 'Incorrect staff ID or password'
       });
     }
 
-    // 使用 User 模型重置失敗登入次數並更新最後登入時間
+    // Use User model to reset failed login attempts and update last login time
     await User.resetFailedAttempts(staff_id);
     await User.updateLastLogin(staff_id);
 
-    // 使用 User 模型生成 JWT token
+    // Use User model to generate JWT token
     const token = User.generateToken(user);
 
-    console.log(`✅ 登入成功: ${user.name} (Staff ID: ${staff_id})`);
+    console.log(`✅ Login successful: ${user.name} (Staff ID: ${staff_id})`);
 
     res.json({
       success: true,
-      message: '登入成功',
+      message: 'Login successful',
       data: {
         token,
         user: {
@@ -87,15 +87,15 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ 登入錯誤:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({
       success: false,
-      message: '登入過程中發生內部錯誤'
+      message: 'Internal error occurred during login process'
     });
   }
 });
 
-// POST /api/auth/change-password - 更改密碼
+// POST /api/auth/change-password - Change password
 router.post('/change-password', async (req, res) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -103,7 +103,7 @@ router.post('/change-password', async (req, res) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: '存取被拒絕，未提供 token'
+        message: 'Access denied, no token provided'
       });
     }
 
@@ -111,23 +111,23 @@ router.post('/change-password', async (req, res) => {
     if (!decoded) {
       return res.status(401).json({
         success: false,
-        message: '無效的 token'
+        message: 'Invalid token'
       });
     }
 
     const { currentPassword, newPassword } = req.body;
 
-    console.log(`🔑 更改密碼請求: User ID ${decoded.user_id}`);
+    console.log(`🔑 Change password request: User ID ${decoded.user_id}`);
 
-    // 驗證輸入
+    // Validate input
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: '請提供當前密碼和新密碼'
+        message: 'Please provide current password and new password'
       });
     }
 
-    // 驗證新密碼強度
+    // Validate new password strength
     const passwordValidation = User.validatePasswordStrength(newPassword);
     if (!passwordValidation.valid) {
       return res.status(400).json({
@@ -136,53 +136,53 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
-    // 獲取用戶信息
+    // Get user information
     const user = await User.findById(decoded.user_id);
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '找不到用戶'
+        message: 'User not found'
       });
     }
 
-    // 驗證當前密碼
+    // Validate current password
     const isValidPassword = await User.validatePassword(currentPassword, user.password);
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
-        message: '當前密碼錯誤'
+        message: 'Current password is incorrect'
       });
     }
 
-    // 使用 User 模型更改密碼
+    // Use User model to change password
     await User.changePassword(user.staff_id, newPassword);
 
-    console.log(`✅ 密碼更改成功: User ID ${decoded.user_id}`);
+    console.log(`✅ Password change successful: User ID ${decoded.user_id}`);
 
     res.json({
       success: true,
-      message: '密碼更改成功'
+      message: 'Password changed successfully'
     });
 
   } catch (error) {
-    console.error('❌ 更改密碼錯誤:', error);
+    console.error('❌ Change password error:', error);
     res.status(500).json({
       success: false,
-      message: '更改密碼過程中發生內部錯誤'
+      message: 'Internal error occurred during password change process'
     });
   }
 });
 
-// POST /api/auth/logout - 登出
+// POST /api/auth/logout - Logout
 router.post('/logout', (req, res) => {
-  console.log('👋 用戶登出');
+  console.log('👋 User logout');
   res.json({
     success: true,
-    message: '登出成功，請從客戶端儲存中移除 token'
+    message: 'Logout successful, please remove token from client storage'
   });
 });
 
-// GET /api/auth/verify - 驗證 token 有效性
+// GET /api/auth/verify - Verify token validity
 router.get('/verify', async (req, res) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -190,7 +190,7 @@ router.get('/verify', async (req, res) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: '未提供 token'
+        message: 'No token provided'
       });
     }
 
@@ -198,24 +198,24 @@ router.get('/verify', async (req, res) => {
     if (!decoded) {
       return res.status(401).json({
         success: false,
-        message: 'Token 無效或已過期'
+        message: 'Token is invalid or expired'
       });
     }
 
-    // 使用 User 模型驗證用戶是否仍然存在且有效
+    // Use User model to verify user still exists and is valid
     const user = await User.findById(decoded.user_id);
     if (!user || user.account_locked) {
       return res.status(401).json({
         success: false,
-        message: 'Token 無效或帳戶已被鎖定'
+        message: 'Token is invalid or account is locked'
       });
     }
 
-    console.log(`✅ Token 驗證成功: ${user.name}`);
+    console.log(`✅ Token verification successful: ${user.name}`);
 
     res.json({
       success: true,
-      message: 'Token 有效',
+      message: 'Token is valid',
       data: {
         user: {
           staffId: user.staff_id,
@@ -227,30 +227,30 @@ router.get('/verify', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Token 驗證錯誤:', error);
+    console.error('❌ Token verification error:', error);
     res.status(401).json({
       success: false,
-      message: 'Token 無效或已過期'
+      message: 'Token is invalid or expired'
     });
   }
 });
 
-// POST /api/auth/create-account - 創建新用戶帳戶 (管理員功能)
+// POST /api/auth/create-account - Create new user account (admin function)
 router.post('/create-account', async (req, res) => {
   try {
     const { staff_id, password, role = 'staff' } = req.body;
     
-    console.log(`👤 創建新用戶帳戶: Staff ID ${staff_id}`);
+    console.log(`👤 Creating new user account: Staff ID ${staff_id}`);
 
-    // 基本驗證
+    // Basic validation
     if (!staff_id || !password) {
       return res.status(400).json({
         success: false,
-        message: '請提供員工 ID 和密碼'
+        message: 'Please provide staff ID and password'
       });
     }
 
-    // 驗證密碼強度
+    // Validate password strength
     const passwordValidation = User.validatePasswordStrength(password);
     if (!passwordValidation.valid) {
       return res.status(400).json({
@@ -259,14 +259,14 @@ router.post('/create-account', async (req, res) => {
       });
     }
 
-    // 使用 User 模型創建帳戶
+    // Use User model to create account
     const newUser = await User.create({ staff_id, password, role });
 
-    console.log(`✅ 成功創建用戶帳戶: Staff ID ${staff_id}`);
+    console.log(`✅ Successfully created user account: Staff ID ${staff_id}`);
 
     res.status(201).json({
       success: true,
-      message: '用戶帳戶創建成功',
+      message: 'User account created successfully',
       data: {
         user_id: newUser.user_id,
         staff_id: newUser.staff_id,
@@ -275,25 +275,25 @@ router.post('/create-account', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ 創建用戶帳戶錯誤:', error);
+    console.error('❌ Create user account error:', error);
     
     if (error.message === 'Staff ID does not exist') {
       return res.status(400).json({
         success: false,
-        message: '員工 ID 不存在'
+        message: 'Staff ID does not exist'
       });
     }
     
     if (error.message === 'User account already exists') {
       return res.status(409).json({
         success: false,
-        message: '用戶帳戶已存在'
+        message: 'User account already exists'
       });
     }
 
     res.status(500).json({
       success: false,
-      message: '創建用戶帳戶時發生內部錯誤'
+      message: 'Internal error occurred while creating user account'
     });
   }
 });

@@ -1,8 +1,8 @@
-// middleware/auth.js - 更新版認證中間件（配合你的資料庫結構）
+// middleware/auth.js - Updated authentication middleware (matching your database structure)
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 
-// 驗證 JWT Token
+// Verify JWT Token
 const verifyToken = (token) => {
   try {
     return jwt.verify(token, process.env.JWT_SECRET);
@@ -11,7 +11,7 @@ const verifyToken = (token) => {
   }
 };
 
-// 根據 user_id 查找用戶
+// Find user by user_id
 const findUserById = async (userId) => {
   try {
     const query = `
@@ -32,12 +32,12 @@ const findUserById = async (userId) => {
     const result = await pool.query(query, [userId]);
     return result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
-    console.error('查找用戶錯誤:', error);
+    console.error('Error finding user:', error);
     return null;
   }
 };
 
-// 主要認證中間件
+// Main authentication middleware
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -45,7 +45,7 @@ const authMiddleware = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: '無訪問權限，需要有效的 token'
+        message: 'Access denied, valid token required'
       });
     }
 
@@ -53,28 +53,28 @@ const authMiddleware = async (req, res, next) => {
     if (!decoded) {
       return res.status(401).json({
         success: false,
-        message: '無效的 token'
+        message: 'Invalid token'
       });
     }
 
-    // 使用 decoded.userId 獲取用戶信息（根據你的 JWT 結構）
+    // Use decoded.userId to get user information (based on your JWT structure)
     const user = await findUserById(decoded.userId);
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: '用戶不存在'
+        message: 'User does not exist'
       });
     }
 
-    // 檢查帳戶是否被鎖定
+    // Check if account is locked
     if (user.account_locked) {
       return res.status(423).json({
         success: false,
-        message: '帳戶已被鎖定'
+        message: 'Account is locked'
       });
     }
 
-    // 將用戶信息添加到請求對象
+    // Add user information to request object
     req.user = user;
     req.staff = {
       staffId: user.staff_id,
@@ -84,31 +84,31 @@ const authMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('認證中間件錯誤:', error);
+    console.error('Authentication middleware error:', error);
     res.status(500).json({
       success: false,
-      message: '伺服器錯誤'
+      message: 'Server error'
     });
   }
 };
 
-// 角色檢查中間件
+// Role checking middleware
 const requireRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: '未認證'
+        message: 'Not authenticated'
       });
     }
 
-    // 支援傳入單個角色或角色陣列
+    // Support passing single role or array of roles
     const allowedRoles = Array.isArray(roles) ? roles : [roles];
     
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: '權限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -116,28 +116,28 @@ const requireRole = (roles) => {
   };
 };
 
-// 管理員權限檢查
+// Admin permission check
 const requireAdmin = requireRole(['Admin']);
 
-// 管理員或經理權限檢查
+// Manager or Admin permission check
 const requireManagerOrAdmin = requireRole(['Admin', 'Manager']);
 
-// HR 權限檢查
+// HR permission check
 const requireHR = requireRole(['HR']);
 
-// 員工資料所有權檢查 (員工只能存取自己的資料，HR 可存取所有人的)
+// Staff data ownership check (staff can only access their own data, HR can access everyone's)
 const requireOwnership = (req, res, next) => {
   const requestedStaffId = req.params.staffId || req.body.staffId;
   
   if (req.user.role === 'HR' || req.user.role === 'Admin') {
-    // HR 和管理員可以存取任何員工資料
+    // HR and Admin can access any staff data
     return next();
   }
 
   if (requestedStaffId && parseInt(requestedStaffId) !== req.user.staff_id) {
     return res.status(403).json({
       success: false,
-      message: '存取被拒絕，您只能存取自己的資料'
+      message: 'Access denied, you can only access your own data'
     });
   }
 

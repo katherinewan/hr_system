@@ -1,4 +1,4 @@
-// routes/staffRoutes.js - 最終版本（整合 Profile 功能）
+// routes/staffRoutes.js - Final version (integrated Profile functionality)
 const express = require('express');
 const router = express.Router();
 const { 
@@ -14,20 +14,20 @@ const {
 } = require('../controllers/staffController');
 const { authMiddleware } = require('../middleware/auth');
 
-console.log('🛣️ 載入員工路由...');
+console.log('🛣️ Loading staff routes...');
 
-// 記錄請求的中間件
+// Request logging middleware
 const logRequest = (req, res, next) => {
   console.log(`🌐 ${req.method} ${req.originalUrl} - ${new Date().toLocaleTimeString()}`);
-  console.log('📋 請求參數:', req.params);
-  console.log('🔍 查詢參數:', req.query);
+  console.log('📋 Request params:', req.params);
+  console.log('🔍 Query params:', req.query);
   next();
 };
 
-// 應用記錄中間件到所有路由
+// Apply logging middleware to all routes
 router.use(logRequest);
 
-// 輔助函數：格式化員工資料
+// Helper function: Format staff data
 const formatStaffData = (staff) => {
   return {
     ...staff,
@@ -35,161 +35,161 @@ const formatStaffData = (staff) => {
   };
 };
 
-// ============ 員工個人資料相關路由 (需要認證) ============
+// ============ Staff Profile Related Routes (requires authentication) ============
 
-// GET /api/staff/profile - 獲取登入員工的個人資料
+// GET /api/staff/profile - Get logged-in staff profile
 router.get('/profile', authMiddleware, getStaffProfile);
 
-// PUT /api/staff/profile - 更新員工個人資料 (限制可編輯欄位)
+// PUT /api/staff/profile - Update staff profile (limited editable fields)
 router.put('/profile', authMiddleware, updateStaffProfile);
 
-// GET /api/staff/work-summary - 獲取工作統計摘要
+// GET /api/staff/work-summary - Get work statistics summary
 router.get('/work-summary', authMiddleware, getWorkSummary);
 
-// ============ 一般員工管理路由 (公開或管理員) ============
+// ============ General Staff Management Routes (public or admin) ============
 
-// GET /api/staff/search?name=搜尋關鍵字 - 搜尋員工
+// GET /api/staff/search?name=search_keyword - Search staff
 router.get('/search', async (req, res) => {
   try {
     const { name } = req.query;
-    console.log(`🔍 搜尋員工：${name}`);
+    console.log(`🔍 Searching staff: ${name}`);
     
     if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
-        message: '請提供搜尋的姓名'
+        message: 'Please provide a name to search'
       });
     }
     
     await searchStaffByName(req, res);
     
   } catch (error) {
-    console.error('❌ 搜尋員工錯誤:', error);
+    console.error('❌ Error searching staff:', error);
     res.status(500).json({
       success: false,
-      message: '搜尋員工失敗',
+      message: 'Staff search failed',
       error: error.message
     });
   }
 });
 
-// GET /api/staff - 獲取所有員工
+// GET /api/staff - Get all staff
 router.get('/', async (req, res) => {
   try {
-    console.log('📋 獲取所有員工資料...');
+    console.log('📋 Getting all staff data...');
     
     await getAllStaff(req, res);
     
   } catch (error) {
-    console.error('❌ 獲取員工資料錯誤:', error);
+    console.error('❌ Error retrieving staff data:', error);
     res.status(500).json({
       success: false,
-      message: '獲取員工資料失敗',
+      message: 'Failed to retrieve staff data',
       error: error.message
     });
   }
 });
 
-// GET /api/staff/:staff_id - 根據 ID 獲取單個員工
+// GET /api/staff/:staff_id - Get single staff by ID
 router.get('/:id', async (req, res) => {
   try {
     const staffId = req.params.id;
-    console.log(`🔍 獲取員工 ID: ${staffId}`);
+    console.log(`🔍 Getting staff ID: ${staffId}`);
     
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^\d+$/.test(staffId)) {
-      console.log(`❌ 無效的員工 ID 格式: ${staffId}`);
+      console.log(`❌ Invalid staff ID format: ${staffId}`);
       return res.status(400).json({
         success: false,
-        message: '無效的員工 ID 格式'
+        message: 'Invalid staff ID format'
       });
     }
     
     await getStaffById(req, res);
     
   } catch (error) {
-    console.error('❌ 獲取員工資料錯誤:', error);
+    console.error('❌ Error retrieving staff data:', error);
     res.status(500).json({
       success: false,
-      message: '獲取員工資料失敗',
+      message: 'Failed to retrieve staff data',
       error: error.message
     });
   }
 });
 
-// POST /api/staff - 新增員工
+// POST /api/staff - Create staff
 router.post('/', async (req, res) => {
   try {
     const { name } = req.body;
-    console.log('➕ 新增員工:', name);
+    console.log('➕ Creating staff:', name);
     
     await createStaff(req, res);
     
   } catch (error) {
-    console.error('❌ 新增員工錯誤:', error);
+    console.error('❌ Error creating staff:', error);
     
     if (error.code === '23505') {
       return res.status(400).json({
         success: false,
-        message: '該電子郵件或電話號碼已被使用'
+        message: 'This email or phone number is already in use'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: '新增員工失敗',
+      message: 'Failed to create staff',
       error: error.message
     });
   }
 });
 
-// PUT /api/staff/:id - 更新員工資料
+// PUT /api/staff/:id - Update staff data
 router.put('/:id', async (req, res) => {
   try {
     const staffId = req.params.id;
-    console.log(`✏️ 更新員工 ID: ${staffId}`);
+    console.log(`✏️ Updating staff ID: ${staffId}`);
     
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^\d+$/.test(staffId)) {
       return res.status(400).json({
         success: false,
-        message: '無效的員工 ID 格式'
+        message: 'Invalid staff ID format'
       });
     }
     
     await updateStaff(req, res);
     
   } catch (error) {
-    console.error('❌ 更新員工錯誤:', error);
+    console.error('❌ Error updating staff:', error);
     res.status(500).json({
       success: false,
-      message: '更新員工資料失敗',
+      message: 'Failed to update staff data',
       error: error.message
     });
   }
 });
 
-// DELETE /api/staff/:id - 刪除員工
+// DELETE /api/staff/:id - Delete staff
 router.delete('/:id', async (req, res) => {
   try {
     const staffId = req.params.id;
-    console.log(`🗑️ 刪除員工 ID: ${staffId}`);
+    console.log(`🗑️ Deleting staff ID: ${staffId}`);
     
-    // 驗證 ID 格式
+    // Validate ID format
     if (!/^\d+$/.test(staffId)) {
       return res.status(400).json({
         success: false,
-        message: '無效的員工 ID 格式'
+        message: 'Invalid staff ID format'
       });
     }
     
     await deleteStaff(req, res);
     
   } catch (error) {
-    console.error('❌ 刪除員工錯誤:', error);
+    console.error('❌ Error deleting staff:', error);
     res.status(500).json({
       success: false,
-      message: '刪除員工失敗',
+      message: 'Failed to delete staff',
       error: error.message
     });
   }

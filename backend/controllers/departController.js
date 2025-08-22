@@ -1,41 +1,41 @@
 // controllers/departController.js
 const { query } = require('../config/database');
 
-console.log('🏢 載入部門控制器...');
+console.log('🏢 Loading department controller...');
 
-// 輔助函數：驗證部門數據
+// Helper function: Validate department data
 const validateDepartmentData = (data, isUpdate = false) => {
   const errors = [];
   
   if (!isUpdate && (!data.department_id || data.department_id === '')) {
-    errors.push('部門ID為必填項');
+    errors.push('Department ID is required');
   }
   
   if (!data.department_name || !data.department_name.trim()) {
-    errors.push('部門名稱為必填項');
+    errors.push('Department name is required');
   }
   
   if (!data.department_head || !data.department_head.trim()) {
-    errors.push('部門主管為必填項');
+    errors.push('Department head is required');
   }
   
-  // 驗證部門名稱長度
+  // Validate department name length
   if (data.department_name && data.department_name.length > 100) {
-    errors.push('部門名稱不能超過100個字符');
+    errors.push('Department name cannot exceed 100 characters');
   }
   
-  // 驗證部門主管名稱長度
+  // Validate department head name length
   if (data.department_head && data.department_head.length > 100) {
-    errors.push('部門主管名稱不能超過100個字符');
+    errors.push('Department head name cannot exceed 100 characters');
   }
   
   return errors;
 };
 
-// 獲取所有部門
+// Get all departments
 const getAllDepartments = async (req, res) => {
   try {
-    console.log('📥 請求：獲取所有部門');
+    console.log('📥 Request: Get all departments');
     
     const result = await query(`
       SELECT 
@@ -49,34 +49,34 @@ const getAllDepartments = async (req, res) => {
       ORDER BY d.department_id
     `);
     
-    console.log(`✅ 成功獲取 ${result.rows.length} 個部門`);
+    console.log(`✅ Successfully retrieved ${result.rows.length} departments`);
     
     res.json({
       success: true,
-      message: `成功獲取 ${result.rows.length} 個部門資料`,
+      message: `Successfully retrieved ${result.rows.length} department records`,
       data: result.rows,
       count: result.rows.length
     });
   } catch (error) {
-    console.error('❌ 獲取部門列表錯誤:', error);
+    console.error('❌ Error retrieving department list:', error);
     res.status(500).json({
       success: false,
-      message: '獲取部門資料失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve department data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 根據ID獲取單一部門
+// Get department by ID
 const getDepartmentById = async (req, res) => {
   try {
     const { department_id } = req.params;
-    console.log(`📥 請求：獲取部門 ID ${department_id}`);
+    console.log(`📥 Request: Get department ID ${department_id}`);
     
     if (!department_id) {
       return res.status(400).json({
         success: false,
-        message: '部門ID為必填參數'
+        message: 'Department ID is a required parameter'
       });
     }
     
@@ -95,44 +95,44 @@ const getDepartmentById = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到部門 ID ${department_id}`
+        message: `Department ID ${department_id} not found`
       });
     }
     
-    console.log(`✅ 成功獲取部門 ID ${department_id}`);
+    console.log(`✅ Successfully retrieved department ID ${department_id}`);
     
     res.json({
       success: true,
-      message: '成功獲取部門資料',
+      message: 'Successfully retrieved department data',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 獲取部門錯誤:', error);
+    console.error('❌ Error retrieving department:', error);
     res.status(500).json({
       success: false,
-      message: '獲取部門資料失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to retrieve department data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 新增部門
+// Create department
 const createDepartment = async (req, res) => {
   try {
     const { department_id, department_name, department_head } = req.body;
-    console.log(`📥 請求：新增部門 ${department_name}`);
+    console.log(`📥 Request: Create department ${department_name}`);
     
-    // 驗證數據
+    // Validate data
     const validationErrors = validateDepartmentData(req.body);
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '數據驗證失敗',
+        message: 'Data validation failed',
         errors: validationErrors
       });
     }
     
-    // 檢查部門ID是否已存在
+    // Check if department ID already exists
     const existingDeptById = await query(
       'SELECT department_id FROM department WHERE department_id = $1',
       [department_id]
@@ -141,11 +141,11 @@ const createDepartment = async (req, res) => {
     if (existingDeptById.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `部門 ID ${department_id} 已存在`
+        message: `Department ID ${department_id} already exists`
       });
     }
     
-    // 檢查部門名稱是否已存在
+    // Check if department name already exists
     const existingDeptByName = await query(
       'SELECT department_id FROM department WHERE department_name = $1',
       [department_name]
@@ -154,7 +154,7 @@ const createDepartment = async (req, res) => {
     if (existingDeptByName.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `部門名稱「${department_name}」已存在`
+        message: `Department name "${department_name}" already exists`
       });
     }
     
@@ -164,50 +164,50 @@ const createDepartment = async (req, res) => {
       RETURNING *
     `, [department_id, department_name, department_head]);
     
-    console.log(`✅ 成功新增部門 ID ${result.rows[0].department_id}`);
+    console.log(`✅ Successfully created department ID ${result.rows[0].department_id}`);
     
     res.status(201).json({
       success: true,
-      message: '部門新增成功',
+      message: 'Department created successfully',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 新增部門錯誤:', error);
+    console.error('❌ Error creating department:', error);
     
-    // 處理特定的PostgreSQL錯誤
-    if (error.code === '23505') { // 唯一性約束違反
+    // Handle specific PostgreSQL errors
+    if (error.code === '23505') { // Unique constraint violation
       return res.status(400).json({
         success: false,
-        message: '部門ID或部門名稱已存在'
+        message: 'Department ID or department name already exists'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: '新增部門失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to create department',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 更新部門
+// Update department
 const updateDepartment = async (req, res) => {
   try {
     const { department_id } = req.params;
     const { department_name, department_head } = req.body;
-    console.log(`📥 請求：更新部門 ID ${department_id}`);
+    console.log(`📥 Request: Update department ID ${department_id}`);
     
-    // 驗證數據（更新時不需要驗證department_id）
+    // Validate data (no need to validate department_id for updates)
     const validationErrors = validateDepartmentData(req.body, true);
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: '數據驗證失敗',
+        message: 'Data validation failed',
         errors: validationErrors
       });
     }
     
-    // 檢查部門是否存在
+    // Check if department exists
     const existingDepartment = await query(
       'SELECT department_name FROM department WHERE department_id = $1',
       [department_id]
@@ -216,11 +216,11 @@ const updateDepartment = async (req, res) => {
     if (existingDepartment.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到部門 ID ${department_id}`
+        message: `Department ID ${department_id} not found`
       });
     }
     
-    // 檢查部門名稱是否已被其他部門使用
+    // Check if department name is already used by another department
     const duplicateCheck = await query(
       'SELECT department_id FROM department WHERE department_name = $1 AND department_id != $2',
       [department_name, department_id]
@@ -229,7 +229,7 @@ const updateDepartment = async (req, res) => {
     if (duplicateCheck.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `部門名稱「${department_name}」已存在於其他部門`
+        message: `Department name "${department_name}" already exists in another department`
       });
     }
     
@@ -240,46 +240,46 @@ const updateDepartment = async (req, res) => {
       RETURNING *
     `, [department_name, department_head, department_id]);
     
-    console.log(`✅ 成功更新部門 ID ${department_id}`);
+    console.log(`✅ Successfully updated department ID ${department_id}`);
     
     res.json({
       success: true,
-      message: '部門更新成功',
+      message: 'Department updated successfully',
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ 更新部門錯誤:', error);
+    console.error('❌ Error updating department:', error);
     
-    // 處理特定的PostgreSQL錯誤
+    // Handle specific PostgreSQL errors
     if (error.code === '23505') {
       return res.status(400).json({
         success: false,
-        message: '部門名稱已存在'
+        message: 'Department name already exists'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: '更新部門失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to update department',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 刪除部門
+// Delete department
 const deleteDepartment = async (req, res) => {
   try {
     const { department_id } = req.params;
-    console.log(`📥 請求：刪除部門 ID ${department_id}`);
+    console.log(`📥 Request: Delete department ID ${department_id}`);
     
     if (!department_id) {
       return res.status(400).json({
         success: false,
-        message: '部門ID為必填參數'
+        message: 'Department ID is a required parameter'
       });
     }
     
-    // 檢查部門是否存在
+    // Check if department exists
     const existingDepartment = await query(
       'SELECT department_name FROM department WHERE department_id = $1',
       [department_id]
@@ -288,11 +288,11 @@ const deleteDepartment = async (req, res) => {
     if (existingDepartment.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `找不到部門 ID ${department_id}`
+        message: `Department ID ${department_id} not found`
       });
     }
     
-    // 檢查是否有職位屬於此部門
+    // Check if there are positions belonging to this department
     const positionCheck = await query(
       'SELECT COUNT(*) as count FROM position WHERE department_id = $1',
       [department_id]
@@ -302,7 +302,7 @@ const deleteDepartment = async (req, res) => {
     if (positionCount > 0) {
       return res.status(400).json({
         success: false,
-        message: `無法刪除部門，該部門仍有 ${positionCount} 個職位`
+        message: `Cannot delete department, it still has ${positionCount} positions`
       });
     }
     
@@ -312,27 +312,27 @@ const deleteDepartment = async (req, res) => {
       RETURNING *
     `, [department_id]);
     
-    console.log(`✅ 成功刪除部門 ID ${department_id} (${existingDepartment.rows[0].department_name})`);
+    console.log(`✅ Successfully deleted department ID ${department_id} (${existingDepartment.rows[0].department_name})`);
     
     res.json({
       success: true,
-      message: `部門「${existingDepartment.rows[0].department_name}」(ID: ${department_id}) 已成功刪除`
+      message: `Department "${existingDepartment.rows[0].department_name}" (ID: ${department_id}) has been successfully deleted`
     });
   } catch (error) {
-    console.error('❌ 刪除部門錯誤:', error);
+    console.error('❌ Error deleting department:', error);
     
-    // 處理外鍵約束錯誤
+    // Handle foreign key constraint errors
     if (error.code === '23503') {
       return res.status(400).json({
         success: false,
-        message: '無法刪除部門，該部門正被其他記錄引用'
+        message: 'Cannot delete department, it is referenced by other records'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: '刪除部門失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部伺服器錯誤'
+      message: 'Failed to delete department',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
