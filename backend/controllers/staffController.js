@@ -1,13 +1,12 @@
-// controllers/staffController.js - Complete staff controller (using existing User model)
+// controllers/staffController.js - Clean version
 const { pool } = require('../config/database');
-const { authMiddleware } = require('../middleware/auth');
 
-console.log('📋 Loading staff controller...');
+console.log('Loading staff controller...');
 
 // Get all staff
 const getAllStaff = async (req, res) => {
   try {
-    console.log('📥 Request: Get all staff');
+    console.log('Request: Get all staff');
     
     const result = await pool.query(`
       SELECT 
@@ -15,6 +14,7 @@ const getAllStaff = async (req, res) => {
         name,
         nickname,
         gender,
+        birthday,
         age,
         hire_date,
         email,
@@ -27,7 +27,7 @@ const getAllStaff = async (req, res) => {
       ORDER BY staff_id
     `);
     
-    console.log(`✅ Successfully retrieved ${result.rows.length} staff members`);
+    console.log(`Successfully retrieved ${result.rows.length} staff members`);
     
     res.json({
       success: true,
@@ -36,7 +36,7 @@ const getAllStaff = async (req, res) => {
       count: result.rows.length
     });
   } catch (error) {
-    console.error('❌ Error retrieving staff list:', error);
+    console.error('Error retrieving staff list:', error);
     res.status(500).json({
       success: false,
       message: 'Unable to retrieve staff data',
@@ -49,7 +49,7 @@ const getAllStaff = async (req, res) => {
 const getStaffById = async (req, res) => {
   try {
     const { staff_id } = req.params;
-    console.log(`📥 Request: Get staff ID ${staff_id}`);
+    console.log(`Request: Get staff ID ${staff_id}`);
     
     // Validate ID format
     if (!/^\d+$/.test(staff_id)) {
@@ -65,6 +65,7 @@ const getStaffById = async (req, res) => {
         name,
         nickname,
         gender,
+        birthday,
         age,
         hire_date,
         email,
@@ -84,7 +85,7 @@ const getStaffById = async (req, res) => {
       });
     }
     
-    console.log(`✅ Found staff ID ${staff_id} data`);
+    console.log(`Found staff ID ${staff_id} data`);
     
     res.json({
       success: true,
@@ -93,7 +94,7 @@ const getStaffById = async (req, res) => {
       staff_id: staff_id.trim()
     });
   } catch (error) {
-    console.error('❌ Error retrieving staff:', error);
+    console.error('Error retrieving staff:', error);
     res.status(500).json({
       success: false,
       message: 'Unable to retrieve staff data',
@@ -106,7 +107,7 @@ const getStaffById = async (req, res) => {
 const searchStaffByName = async (req, res) => {
   try {
     const { name } = req.query;
-    console.log(`📥 Request: Search for staff names containing "${name}"`);
+    console.log(`Request: Search for staff names containing "${name}"`);
     
     if (!name || name.trim() === '') {
       return res.status(400).json({
@@ -121,6 +122,7 @@ const searchStaffByName = async (req, res) => {
         name,
         nickname,
         gender,
+        birthday,
         age,
         hire_date,
         email,
@@ -135,7 +137,7 @@ const searchStaffByName = async (req, res) => {
       ORDER BY staff_id
     `, [`%${name.trim()}%`]);
     
-    console.log(`✅ Found ${result.rows.length} matching staff members`);
+    console.log(`Found ${result.rows.length} matching staff members`);
     
     res.json({
       success: true,
@@ -145,7 +147,7 @@ const searchStaffByName = async (req, res) => {
       searchTerm: name.trim()
     });
   } catch (error) {
-    console.error('❌ Error searching staff:', error);
+    console.error('Error searching staff:', error);
     res.status(500).json({
       success: false,
       message: 'Staff search failed',
@@ -162,7 +164,7 @@ const createStaff = async (req, res) => {
       name,
       nickname,
       gender,
-      age,
+      birthday,
       hire_date,
       email,
       address,
@@ -172,13 +174,13 @@ const createStaff = async (req, res) => {
       position_id
     } = req.body;
 
-    console.log('📥 Request: Create staff', { name, email });
+    console.log('Request: Create staff', { name, email });
 
     // Validate required fields
-    if (!name || !email || !phone_number || !age || !hire_date) {
+    if (!name || !email || !phone_number || !birthday || !hire_date) {
       return res.status(400).json({
         success: false,
-        message: 'Please fill in all required fields: name, email, phone number, age, hire date'
+        message: 'Please fill in all required fields: name, email, phone number, birthday, hire date'
       });
     }
 
@@ -188,14 +190,6 @@ const createStaff = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Invalid email format'
-      });
-    }
-
-    // Validate age
-    if (age < 1 || age > 120) {
-      return res.status(400).json({
-        success: false,
-        message: 'Age must be between 1-120'
       });
     }
 
@@ -211,7 +205,7 @@ const createStaff = async (req, res) => {
     // Insert new staff into database
     const result = await pool.query(`
     INSERT INTO staff (
-      staff_id, name, nickname, gender, age, hire_date, email, address, 
+      staff_id, name, nickname, gender, birthday, hire_date, email, address, 
       phone_number, emer_phone, emer_name, position_id
     ) 
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -221,7 +215,7 @@ const createStaff = async (req, res) => {
     name.trim(),
     nickname?.trim() || null,
     gender || 'male',
-    parseInt(age),
+    birthday,
     hire_date,
     email.trim(),
     address?.trim() || null,
@@ -231,7 +225,7 @@ const createStaff = async (req, res) => {
     position_id?.trim() || null
   ]);
 
-    console.log(`✅ Successfully created staff ID ${result.rows[0].staff_id}`);
+    console.log(`Successfully created staff ID ${result.rows[0].staff_id}`);
 
     res.status(201).json({
       success: true,
@@ -239,7 +233,7 @@ const createStaff = async (req, res) => {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ Error creating staff:', error);
+    console.error('Error creating staff:', error);
     res.status(500).json({
       success: false,
       message: 'Unable to create staff',
@@ -248,15 +242,15 @@ const createStaff = async (req, res) => {
   }
 };
 
-// Update staff - Complete fixed version
+// Update staff
 const updateStaff = async (req, res) => {
   try {
-    const { id } = req.params; // Get staff_id from URL
+    const { id } = req.params;
     const {
       name,
       nickname,
       gender,
-      age,
+      birthday,
       hire_date,
       email,
       address,
@@ -264,11 +258,10 @@ const updateStaff = async (req, res) => {
       emer_phone,
       emer_name,
       position_id
-    } = req.body; // No longer attempt to get staff_id
+    } = req.body;
 
-    console.log(`📥 Request: Update staff ID ${id}`, { name, email });
+    console.log(`Request: Update staff ID ${id}`, { name, email });
 
-    // Validate ID format
     if (!/^\d+$/.test(id)) {
       return res.status(400).json({
         success: false,
@@ -276,15 +269,13 @@ const updateStaff = async (req, res) => {
       });
     }
 
-    // Validate required fields
-    if (!name || !email || !phone_number || !age || !hire_date) {
+    if (!name || !email || !phone_number || !birthday || !hire_date) {
       return res.status(400).json({
         success: false,
-        message: 'Please fill in all required fields: name, email, phone number, age, hire date'
+        message: 'Please fill in all required fields: name, email, phone number, birthday, hire date'
       });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -293,15 +284,6 @@ const updateStaff = async (req, res) => {
       });
     }
 
-    // Validate age
-    if (age < 1 || age > 120) {
-      return res.status(400).json({
-        success: false,
-        message: 'Age must be between 1-120'
-      });
-    }
-
-    // Check if staff exists
     const existingStaff = await pool.query('SELECT staff_id FROM staff WHERE staff_id = $1', [parseInt(id)]);
     if (existingStaff.rows.length === 0) {
       return res.status(404).json({
@@ -310,7 +292,6 @@ const updateStaff = async (req, res) => {
       });
     }
 
-    // Check if email is used by other staff
     const emailCheck = await pool.query(
       'SELECT staff_id FROM staff WHERE email = $1 AND staff_id != $2', 
       [email, parseInt(id)]
@@ -322,13 +303,12 @@ const updateStaff = async (req, res) => {
       });
     }
 
-    // Update staff data
     const result = await pool.query(`
       UPDATE staff SET 
         name = $1,
         nickname = $2,
         gender = $3,
-        age = $4,
+        birthday = $4,
         hire_date = $5,
         email = $6,
         address = $7,
@@ -342,7 +322,7 @@ const updateStaff = async (req, res) => {
       name.trim(),
       nickname ? String(nickname).trim() : null,
       gender || 'male',
-      parseInt(age),
+      birthday,
       hire_date,
       email.trim(),
       address ? String(address).trim() : null,
@@ -350,10 +330,10 @@ const updateStaff = async (req, res) => {
       emer_phone ? String(emer_phone).trim() : null,
       emer_name ? String(emer_name).trim() : null,
       position_id ? String(position_id).trim() : null,
-      parseInt(id) // Use id from URL parameters
+      parseInt(id)
     ]);
 
-    console.log(`✅ Successfully updated staff ID ${id}`);
+    console.log(`Successfully updated staff ID ${id}`);
 
     res.json({
       success: true,
@@ -361,7 +341,7 @@ const updateStaff = async (req, res) => {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ Error updating staff:', error);
+    console.error('Error updating staff:', error);
     res.status(500).json({
       success: false,
       message: 'Unable to update staff data',
@@ -374,9 +354,8 @@ const updateStaff = async (req, res) => {
 const deleteStaff = async (req, res) => {
   try {
     const { staff_id } = req.params;
-    console.log(`📥 Request: Delete staff ID ${staff_id}`);
+    console.log(`Request: Delete staff ID ${staff_id}`);
 
-    // Validate ID format
     if (!/^\d+$/.test(staff_id)) {
       return res.status(400).json({
         success: false,
@@ -384,7 +363,6 @@ const deleteStaff = async (req, res) => {
       });
     }
 
-    // Check if staff exists
     const existingStaff = await pool.query('SELECT name FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
     if (existingStaff.rows.length === 0) {
       return res.status(404).json({
@@ -395,17 +373,16 @@ const deleteStaff = async (req, res) => {
 
     const staffName = existingStaff.rows[0].name;
 
-    // Delete staff
     await pool.query('DELETE FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
 
-    console.log(`✅ Successfully deleted staff ID ${staff_id} (${staffName})`);
+    console.log(`Successfully deleted staff ID ${staff_id} (${staffName})`);
 
     res.json({
       success: true,
       message: `Staff ${staffName} (ID: ${staff_id}) has been successfully deleted`
     });
   } catch (error) {
-    console.error('❌ Error deleting staff:', error);
+    console.error('Error deleting staff:', error);
     res.status(500).json({
       success: false,
       message: 'Unable to delete staff',
@@ -414,21 +391,19 @@ const deleteStaff = async (req, res) => {
   }
 };
 
-// ============ Staff Profile Related Functions (requires authentication) ============
-
 // Get logged-in staff profile
 const getStaffProfile = async (req, res) => {
   try {
-    const staffId = req.staff.staffId; // From authMiddleware
-    console.log(`📥 Request: Get staff profile ID ${staffId}`);
+    const staffId = req.staff.staffId;
+    console.log(`Request: Get staff profile ID ${staffId}`);
 
-    // Get complete staff data and position information
     const staffQuery = `
       SELECT 
         s.staff_id,
         s.name,
         s.nickname,
         s.gender,
+        s.birthday,
         s.age,
         s.hire_date,
         s.email,
@@ -437,11 +412,13 @@ const getStaffProfile = async (req, res) => {
         s.emer_phone,
         s.emer_name,
         s.position_id,
-        p.position_name,
-        p.department,
-        p.base_salary
+        p.title AS position_name,
+        d.department_name,
+        sal.basic_salary
       FROM staff s
-      LEFT JOIN positions p ON s.position_id = p.position_id
+      LEFT JOIN position p ON s.position_id = p.position_id
+      LEFT JOIN department d ON p.department_id = d.department_id
+      LEFT JOIN salary sal ON s.staff_id = sal.staff_id
       WHERE s.staff_id = $1
     `;
 
@@ -456,13 +433,13 @@ const getStaffProfile = async (req, res) => {
 
     const staffProfile = result.rows[0];
 
-    // Format response data
     const profileData = {
       staffId: staffProfile.staff_id,
       personalInfo: {
         name: staffProfile.name,
         nickname: staffProfile.nickname,
         gender: staffProfile.gender,
+        birthday: staffProfile.birthday,
         age: staffProfile.age,
         email: staffProfile.email,
         phoneNumber: staffProfile.phone_number,
@@ -472,8 +449,8 @@ const getStaffProfile = async (req, res) => {
         hireDate: staffProfile.hire_date,
         positionId: staffProfile.position_id,
         positionName: staffProfile.position_name,
-        department: staffProfile.department,
-        baseSalary: staffProfile.base_salary
+        department: staffProfile.department_name,
+        basicSalary: staffProfile.basic_salary
       },
       emergencyContact: {
         name: staffProfile.emer_name,
@@ -481,7 +458,7 @@ const getStaffProfile = async (req, res) => {
       }
     };
 
-    console.log(`✅ Successfully retrieved staff data: ${staffProfile.name}`);
+    console.log(`Successfully retrieved staff data: ${staffProfile.name}`);
 
     res.json({
       success: true,
@@ -490,161 +467,11 @@ const getStaffProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error retrieving staff profile:', error);
+    console.error('Error retrieving staff profile:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error occurred while retrieving profile'
-    });
-  }
-};
-
-// Update staff profile (limited editable fields)
-const updateStaffProfile = async (req, res) => {
-  try {
-    const staffId = req.staff.staffId; // From authMiddleware
-    const { 
-      nickname, 
-      phoneNumber, 
-      address, 
-      emergencyContactName, 
-      emergencyContactPhone 
-    } = req.body;
-
-    console.log(`📥 Request: Update staff profile ID ${staffId}`);
-
-    // Validate input
-    if (!nickname && !phoneNumber && !address && !emergencyContactName && !emergencyContactPhone) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one field is required for update'
-      });
-    }
-
-    // Build dynamic update query
-    const updateFields = [];
-    const values = [];
-    let paramCounter = 1;
-
-    if (nickname !== undefined) {
-      updateFields.push(`nickname = $${paramCounter++}`);
-      values.push(nickname);
-    }
-    if (phoneNumber !== undefined) {
-      updateFields.push(`phone_number = $${paramCounter++}`);
-      values.push(phoneNumber);
-    }
-    if (address !== undefined) {
-      updateFields.push(`address = $${paramCounter++}`);
-      values.push(address);
-    }
-    if (emergencyContactName !== undefined) {
-      updateFields.push(`emer_name = $${paramCounter++}`);
-      values.push(emergencyContactName);
-    }
-    if (emergencyContactPhone !== undefined) {
-      updateFields.push(`emer_phone = $${paramCounter++}`);
-      values.push(emergencyContactPhone);
-    }
-
-    values.push(staffId); // Add staff_id for WHERE condition
-
-    const updateQuery = `
-      UPDATE staff 
-      SET ${updateFields.join(', ')}
-      WHERE staff_id = $${paramCounter}
-      RETURNING staff_id, nickname, phone_number, address, emer_name, emer_phone
-    `;
-
-    const result = await pool.query(updateQuery, values);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Staff not found or no changes made'
-      });
-    }
-
-    console.log(`✅ Successfully updated staff profile ID ${staffId}`);
-
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      data: {
-        staffId: result.rows[0].staff_id,
-        updatedFields: {
-          nickname: result.rows[0].nickname,
-          phoneNumber: result.rows[0].phone_number,
-          address: result.rows[0].address,
-          emergencyContactName: result.rows[0].emer_name,
-          emergencyContactPhone: result.rows[0].emer_phone
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error updating staff profile:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error occurred while updating profile'
-    });
-  }
-};
-
-// Get work summary
-const getWorkSummary = async (req, res) => {
-  try {
-    const staffId = req.staff.staffId; // From authMiddleware
-    console.log(`📥 Request: Get work summary ID ${staffId}`);
-
-    // Get work summary statistics
-    const summaryQuery = `
-      SELECT 
-        COUNT(*) as total_work_days,
-        COALESCE(SUM(total_hours), 0) as total_hours_worked,
-        COALESCE(AVG(total_hours), 0) as average_daily_hours
-      FROM attendance 
-      WHERE staff_id = $1 
-      AND status = 'present'
-      AND date >= DATE_TRUNC('month', CURRENT_DATE)
-    `;
-
-    const summaryResult = await pool.query(summaryQuery, [staffId]);
-    
-    // Get hire date to calculate years of service
-    const hireQuery = `SELECT hire_date FROM staff WHERE staff_id = $1`;
-    const hireResult = await pool.query(hireQuery, [staffId]);
-
-    let yearsOfService = 0;
-    if (hireResult.rows.length > 0) {
-      const hireDate = new Date(hireResult.rows[0].hire_date);
-      const currentDate = new Date();
-      yearsOfService = Math.floor((currentDate - hireDate) / (365.25 * 24 * 60 * 60 * 1000));
-    }
-
-    const workSummary = {
-      currentMonth: {
-        totalWorkDays: parseInt(summaryResult.rows[0].total_work_days),
-        totalHours: parseFloat(summaryResult.rows[0].total_hours_worked).toFixed(2),
-        averageDailyHours: parseFloat(summaryResult.rows[0].average_daily_hours).toFixed(2)
-      },
-      tenure: {
-        yearsOfService: yearsOfService
-      }
-    };
-
-    console.log(`✅ Successfully retrieved work summary ID ${staffId}`);
-
-    res.json({
-      success: true,
-      message: 'Work summary retrieved successfully',
-      data: workSummary
-    });
-
-  } catch (error) {
-    console.error('❌ Error retrieving work summary:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error occurred while retrieving work summary'
+      message: 'Internal server error occurred while retrieving profile',
+      error: error.message
     });
   }
 };
@@ -656,7 +483,5 @@ module.exports = {
   createStaff,
   updateStaff,
   deleteStaff,
-  getStaffProfile,
-  updateStaffProfile,
-  getWorkSummary
+  getStaffProfile
 };
