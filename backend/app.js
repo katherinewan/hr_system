@@ -43,7 +43,7 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     endpoints: {
       auth: '/api/auth/*',
-      staff: '/api/staff/*',
+      staff: '/api/staffs/*',
       users: '/api/users/*',
       holidays: '/api/holidays/*',  // New holiday management endpoint
       health: '/health',
@@ -139,7 +139,7 @@ try {
 // Load staff routes
 try {
   const staffRoutes = require('./routes/staffRoutes');
-  app.use('/api/staff', staffRoutes);
+  app.use('/api/staffs', staffRoutes);
   console.log('Staff routes loaded successfully');
 } catch (error) {
   console.warn('Staff routes loading failed:', error.message);
@@ -205,7 +205,6 @@ app.get('/api/auth/test', (req, res) => {
     message: 'Authentication route test successful',
     endpoints: {
       login: 'POST /api/auth/login',
-      register: 'POST /api/auth/register',
       verify: 'POST /api/auth/verify',
       me: 'GET /api/auth/me'
     }

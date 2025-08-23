@@ -195,3 +195,73 @@ INSERT INTO company_holidays (holiday_name, holiday_date, holiday_type, is_recur
 ('Labour Day', '2025-05-01', 'Public Holiday', TRUE, 'International Workers'' Day'),
 ('Christmas Day', '2025-12-25', 'Public Holiday', TRUE, 'Christmas celebration')
 ON CONFLICT (holiday_date, holiday_name) DO NOTHING;
+
+-- 第一步：先添加 birthday 列（如果还没添加的话）
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS birthday DATE;
+
+-- 第二步：清空现有的 age 数据
+UPDATE staff SET age = NULL;
+
+-- 第三步：为现有的22条记录随机生成生日日期
+-- 这里生成1970-2005年之间的随机生日，对应18-55岁左右的年龄范围
+
+UPDATE staff SET birthday = (
+    DATE '1970-01-01' + 
+    (RANDOM() * (DATE '2005-12-31' - DATE '1970-01-01'))::INTEGER
+) WHERE staff_id IS NOT NULL;
+
+-- 或者你也可以为每个员工单独设置生日（更精确的方法）
+-- 以下是为特定员工ID设置生日的示例：
+
+-- 为员工ID 100001-100021 和 999999 设置随机生日
+WITH random_birthdays AS (
+    SELECT 
+        staff_id,
+        (DATE '1970-01-01' + 
+         (RANDOM() * (DATE '2005-12-31' - DATE '1970-01-01'))::INTEGER
+        ) as random_birthday
+    FROM staff 
+    WHERE staff_id IN (
+        100001, 100002, 100003, 100004, 100005, 100006, 100007, 100008, 
+        100009, 100010, 100011, 100012, 100013, 100014, 100015, 100016, 
+        100017, 100018, 100019, 100020, 100021, 999999
+    )
+)
+UPDATE staff 
+SET birthday = random_birthdays.random_birthday
+FROM random_birthdays
+WHERE staff.staff_id = random_birthdays.staff_id;
+
+-- 第四步：如果之前没有设置生成列，现在设置 age 为自动计算列
+-- 删除现有的 age 列并重新创建为生成列
+ALTER TABLE staff DROP COLUMN IF EXISTS age;
+ALTER TABLE staff ADD COLUMN age INTEGER GENERATED ALWAYS AS (
+    CASE 
+        WHEN birthday IS NOT NULL 
+        THEN DATE_PART('year', AGE(birthday))::INTEGER
+        ELSE NULL
+    END
+) STORED;
+
+-- 第五步：验证结果
+SELECT 
+    staff_id,
+    name,
+    birthday,
+    age,
+    CASE 
+        WHEN age >= 18 AND age <= 65 THEN '合理年龄'
+        ELSE '检查年龄'
+    END as age_check
+FROM staff 
+WHERE birthday IS NOT NULL
+ORDER BY staff_id;
+
+-- 如果你想要更具体的年龄分布，可以使用以下查询来检查：
+SELECT 
+    COUNT(*) as total_records,
+    MIN(age) as min_age,
+    MAX(age) as max_age,
+    ROUND(AVG(age)::NUMERIC, 1) as avg_age
+FROM staff 
+WHERE birthday IS NOT NULL;

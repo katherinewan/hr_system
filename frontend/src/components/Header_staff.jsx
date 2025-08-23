@@ -129,7 +129,7 @@ export default function ButtonAppBar() {
   const menuItems = [
     { text: 'Dashboard', icon: <Home />, path: '/staff/' }, // 或 '/staff'
     { text: 'Staff Profile', icon: <Users />, path: '/staff/staff-profile'}, // 加上 /staff 前綴
-    { text: 'Attendance', icon: <Calendar />, path: '/staff/attendance'}, 
+    { text: 'Attendance', icon: <Calendar />, path: '/staff/staff-attendance'}, 
     { text: 'Leave Management', icon: <FileHeart />, path: '/staff/leave'}, 
     { text: 'Payslip', icon: <CircleDollarSign />, path: '/staff/payslip'}, 
     { text: 'Settings', icon: <Settings />, path: '/staff/settings', category: 'system' },

@@ -165,6 +165,7 @@ const createStaff = async (req, res) => {
       nickname,
       gender,
       birthday,
+      age,
       hire_date,
       email,
       address,
@@ -205,10 +206,10 @@ const createStaff = async (req, res) => {
     // Insert new staff into database
     const result = await pool.query(`
     INSERT INTO staff (
-      staff_id, name, nickname, gender, birthday, hire_date, email, address, 
+      staff_id, name, nickname, gender, birthday, age, hire_date, email, address, 
       phone_number, emer_phone, emer_name, position_id
     ) 
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING *
   `, [
     staff_id.trim(),
@@ -216,6 +217,7 @@ const createStaff = async (req, res) => {
     nickname?.trim() || null,
     gender || 'male',
     birthday,
+    parseInt(age) || null,
     hire_date,
     email.trim(),
     address?.trim() || null,
@@ -251,6 +253,7 @@ const updateStaff = async (req, res) => {
       nickname,
       gender,
       birthday,
+      age,
       hire_date,
       email,
       address,
@@ -309,21 +312,23 @@ const updateStaff = async (req, res) => {
         nickname = $2,
         gender = $3,
         birthday = $4,
-        hire_date = $5,
-        email = $6,
-        address = $7,
-        phone_number = $8,
-        emer_phone = $9,
-        emer_name = $10,
-        position_id = $11
-      WHERE staff_id = $12
+        age = $5,    
+        hire_date = $6, 
+        email = $7,
+        address = $8,
+        phone_number = $9,
+        emer_phone = $10,
+        emer_name = $11,
+        position_id = $12
+      WHERE staff_id = $13
       RETURNING *
     `, [
       name.trim(),
       nickname ? String(nickname).trim() : null,
       gender || 'male',
       birthday,
-      hire_date,
+      parseInt(age) || null,  
+      hire_date,       
       email.trim(),
       address ? String(address).trim() : null,
       phone_number.trim(),
@@ -355,14 +360,6 @@ const deleteStaff = async (req, res) => {
   try {
     const { staff_id } = req.params;
     console.log(`Request: Delete staff ID ${staff_id}`);
-
-    if (!/^\d+$/.test(staff_id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Staff ID must be numeric'
-      });
-    }
-
     const existingStaff = await pool.query('SELECT name FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
     if (existingStaff.rows.length === 0) {
       return res.status(404).json({

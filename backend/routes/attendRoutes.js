@@ -11,8 +11,12 @@ const {
   getAttendanceReport,
   updateAttendance,
   deleteAttendance,
-  createAttendance
+  createAttendance,
+  getMyAttendance  // 新添加的函數
 } = require('../controllers/attendController');
+
+// 匯入認證中間件 - 使用你現有的 authMiddleware
+const { authMiddleware } = require('../middleware/auth');
 
 // 記錄請求的中間件
 const logRequest = (req, res, next) => {
@@ -27,6 +31,9 @@ router.use(logRequest);
 
 // GET /api/attendance/report - 獲取出勤報表
 router.get('/report', getAttendanceReport);
+
+// GET /api/attendance/my-records - 獲取當前員工的出勤記錄（需要認證）
+router.get('/my-records', authMiddleware, getMyAttendance);
 
 // GET /api/attendance - 獲取所有出勤記錄（支持篩選和分頁）
 router.get('/', getAllAttendance);

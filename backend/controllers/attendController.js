@@ -394,6 +394,46 @@ const getAttendanceReport = async (req, res) => {
   }
 };
 
+// 在 attendController.js 中修正 getMyAttendance 函數
+const getMyAttendance = async (req, res) => {
+  try {
+    // 從認證中間件獲取員工ID - 注意屬性名是 staffId（在 auth.js 中設置的）
+    const staffId = req.staff.staffId;
+    console.log(`🔥 Request: Get my attendance records for staff ${staffId}`);
+
+    const result = await pool.query(`
+      SELECT 
+        attendance_log,
+        staff_id,
+        TO_CHAR(date, 'YYYY-MM-DD') as date,
+        check_in,
+        check_out,
+        total_hours,
+        status
+      FROM attendance
+      WHERE staff_id = $1
+      ORDER BY date DESC
+      LIMIT 100
+    `, [staffId]);
+
+    console.log(`Found ${result.rows.length} attendance records for staff ${staffId}`);
+
+    res.json({
+      success: true,
+      message: `Successfully retrieved ${result.rows.length} attendance records`,
+      data: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('❌ Error retrieving my attendance records:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to retrieve attendance records', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   getAttendanceByStaffId,
   getAllAttendance,
@@ -401,5 +441,6 @@ module.exports = {
   updateAttendance,
   deleteAttendance,
   getAttendanceReport,
-  createAttendance  // Added
+  createAttendance,
+  getMyAttendance
 };

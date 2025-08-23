@@ -385,7 +385,7 @@ const UserAccountManagementSystem = () => {
           <select
             value={editForm.role || 'Employee'}
             onChange={(e) => handleFormChange('role', e.target.value)}
-            className={validationErrors.role ? 'error' : ''}
+            className={`edit-input ${validationErrors.role ? 'error' : ''}`}
           >
             <option value="Employee">Employee</option>
             <option value="Manager">Manager</option>
@@ -398,7 +398,7 @@ const UserAccountManagementSystem = () => {
           <select
             value={editForm.account_locked ? 'true' : 'false'}
             onChange={(e) => handleFormChange('account_locked', e.target.value === 'true')}
-            className={validationErrors.account_locked ? 'error' : ''}
+            className={`edit-input ${validationErrors.account_locked ? 'error' : ''}`}
           >
             <option value="false">Active</option>
             <option value="true">Locked</option>

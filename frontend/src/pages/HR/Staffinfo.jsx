@@ -20,6 +20,7 @@ const EmployeeManagementSystem = () => {
     name: '',
     nickname: '',
     gender: 'male',
+    birthday: '',
     age: '',
     hire_date: '',
     email: '',
@@ -70,13 +71,12 @@ const EmployeeManagementSystem = () => {
     
     try {
       console.log('Loading staff data...');
-      const response = await fetch(`${API_BASE_URL}/staff`);
+      const response = await fetch(`${API_BASE_URL}/staffs`);
       const data = await response.json();
       
       console.log('API response:', data);
       
       if (data.success) {
-        // Debug: Check data returned from API
         console.log('Staff data:', data.data);
         if (data.data.length > 0) {
           console.log('First staff member:', data.data[0]);
@@ -113,12 +113,12 @@ const EmployeeManagementSystem = () => {
       
       if (/^\d+$/.test(trimmedInput)) {
         console.log(`Searching staff ID: ${trimmedInput}`);
-        response = await fetch(`${API_BASE_URL}/staff/${trimmedInput}`);
+        response = await fetch(`${API_BASE_URL}/staffs/${trimmedInput}`);
       } else {
         console.log(`Searching staff name: ${trimmedInput}`);
         const params = new URLSearchParams();
         params.append('name', trimmedInput);
-        response = await fetch(`${API_BASE_URL}/staff/search?${params.toString()}`);
+        response = await fetch(`${API_BASE_URL}/staffs/search?${params.toString()}`);
       }
       
       const data = await response.json();
@@ -173,20 +173,20 @@ const EmployeeManagementSystem = () => {
     );
   });
 
-  // Format date display - 修復日期顯示問題
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return '';
     try {
-      // 嘗試直接解析日期
-      const date = new Date(dateString);
-      
-      // 檢查日期是否有效
-      if (isNaN(date.getTime())) {
-        console.error('Invalid date:', dateString);
-        return dateString; // 如果無效，返回原始字符串
+      if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateString;
       }
       
-      return date.toLocaleDateString('en-US');
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString;
+      }
+      
+      date.setDate(date.getDate() + 1);
+      return date.toISOString().split('T')[0];
     } catch (error) {
       console.error('Date formatting error:', error);
       return dateString;
@@ -240,7 +240,7 @@ const EmployeeManagementSystem = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/staff/${staffID}`, {
+      const response = await fetch(`${API_BASE_URL}/staffs/${parseInt(staffID)}`, {
         method: 'DELETE'
       });
 
@@ -255,6 +255,31 @@ const EmployeeManagementSystem = () => {
     } catch (error) {
       console.error('Delete error:', error);
       setError('Error occurred during deletion');
+    }
+  };
+
+  // calculate age from birthday
+  const calculateAge = (birthday) => {
+    if (!birthday) return '';
+    try {
+      const birthDate = new Date(birthday);
+      const today = new Date();
+      
+      if (isNaN(birthDate.getTime())) {
+        return '';
+      }
+      
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      return age;
+    } catch (error) {
+      console.error('Error calculating age:', error);
+      return '';
     }
   };
 
@@ -275,11 +300,17 @@ const EmployeeManagementSystem = () => {
     if (staff.hire_date) {
       hireDateValue = formatDateForInput(staff.hire_date);
     }
+
+    let birthdayValue = '';
+    if (staff.birthday) {
+      birthdayValue = formatDateForInput(staff.birthday);
+    }
     
     const formData = {
       name: staff.name || '',
       nickname: staff.nickname || '',
       gender: genderValue,
+      birthday: birthdayValue, 
       age: staff.age || '',
       hire_date: hireDateValue,
       email: staff.email || '',
@@ -305,10 +336,22 @@ const EmployeeManagementSystem = () => {
   // Handle edit form input changes
   const handleFormChange = (field, value) => {
     console.log(`Form change: ${field} = ${value}`);
-    setEditForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    
+    if (field === 'birthday') {
+      const newAge = calculateAge(value);
+      console.log('Birthday changed to:', value, 'New age:', newAge);
+      
+      setEditForm(prev => ({
+        ...prev,
+        [field]: value,
+        age: newAge
+      }));
+    } else {
+      setEditForm(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
     
     if (validationErrors[field]) {
       setValidationErrors(prev => ({
@@ -320,10 +363,21 @@ const EmployeeManagementSystem = () => {
 
   // Handle add staff form input changes
   const handleAddFormChange = (field, value) => {
-    setAddForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    if (field === 'birthday') {
+      const newAge = calculateAge(value);
+      console.log('Add form birthday changed to:', value, 'New age:', newAge);
+      
+      setAddForm(prev => ({
+        ...prev,
+        [field]: value,
+        age: newAge
+      }));
+    } else {
+      setAddForm(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
     
     if (addValidationErrors[field]) {
       setAddValidationErrors(prev => ({
@@ -331,36 +385,6 @@ const EmployeeManagementSystem = () => {
         [field]: ''
       }));
     }
-  };
-
-  // Validate edit form data
-  const validateForm = () => {
-    const errors = {};
-    
-    if (!editForm.name.trim()) {
-      errors.name = 'Name is required';
-    }
-    
-    if (!editForm.email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email)) {
-      errors.email = 'Invalid email format';
-    }
-    
-    if (!editForm.phone_number.trim()) {
-      errors.phone_number = 'Phone number is required';
-    }
-    
-    if (!editForm.age || editForm.age < 1 || editForm.age > 120) {
-      errors.age = 'Age must be between 1-120';
-    }
-    
-    if (!editForm.hire_date) {
-      errors.hire_date = 'Hire date is required';
-    }
-    
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
   // Validate add staff form data
@@ -381,8 +405,13 @@ const EmployeeManagementSystem = () => {
       errors.phone_number = 'Phone number is required';
     }
     
-    if (!addForm.age || addForm.age < 1 || addForm.age > 120) {
-      errors.age = 'Age must be between 1-120';
+    if (!addForm.birthday.trim()) {
+      errors.birthday = 'Birthday is required';
+    } else {
+      const age = calculateAge(addForm.birthday);
+      if (age < 18 || age > 70) {
+        errors.birthday = 'Age must be between 18-70 years old';
+      }
     }
     
     if (!addForm.hire_date) {
@@ -395,10 +424,11 @@ const EmployeeManagementSystem = () => {
 
   // Update staff
   const updateStaff = async (staffID) => {
-    if (!validateForm()) {
+    if (!editForm.name?.trim() || !editForm.email?.trim() || !editForm.phone_number?.trim() || !editForm.birthday || !editForm.hire_date) {
+      setError('Please fill in all required fields');
       return;
     }
-    
+
     setIsUpdating(true);
     
     try {
@@ -406,7 +436,8 @@ const EmployeeManagementSystem = () => {
         name: editForm.name || '',
         nickname: editForm.nickname || '',
         gender: editForm.gender || 'male',
-        age: parseInt(editForm.age) || 0,
+        birthday: editForm.birthday || '',
+        age: editForm.age || '', // 添加这行
         hire_date: editForm.hire_date || '',
         email: editForm.email || '',
         address: editForm.address || '',
@@ -419,7 +450,7 @@ const EmployeeManagementSystem = () => {
       console.log('Updating staff with complete data:', completeData);
       console.log('Staff ID:', staffID);
       
-      const response = await fetch(`${API_BASE_URL}/staff/${staffID}`, {
+      const response = await fetch(`${API_BASE_URL}/staffs/${staffID}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -431,12 +462,7 @@ const EmployeeManagementSystem = () => {
       console.log('Update response:', data);
       
       if (response.ok && data.success) {
-        setStaffList(prev => prev.map(staff => 
-          staff.staff_id === staffID 
-            ? { ...staff, ...completeData }
-            : staff
-        ));
-        
+        await loadAllStaff();
         cancelEditing();
         showSuccess('Staff information updated successfully');
       } else {
@@ -460,25 +486,40 @@ const EmployeeManagementSystem = () => {
     setIsAdding(true);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/staff`, {
+      const staffData = {
+        staff_id: addForm.staff_id,
+        name: addForm.name,
+        nickname: addForm.nickname,
+        gender: addForm.gender,
+        birthday: addForm.birthday,
+        age: addForm.age,
+        hire_date: addForm.hire_date,
+        email: addForm.email,
+        address: addForm.address,
+        phone_number: addForm.phone_number,
+        emer_phone: addForm.emer_phone,
+        emer_name: addForm.emer_name,
+        position_id: addForm.position_id
+      };
+
+      const response = await fetch(`${API_BASE_URL}/staffs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(addForm),
+        body: JSON.stringify(staffData),
       });
       
       const data = await response.json();
       
       if (response.ok && data.success) {
-        setStaffList(prev => [...prev, data.data]);
-        
         setAddForm({
           staff_id: '',
           name: '',
           nickname: '',
           gender: 'male',
           age: '',
+          birthday: '',
           hire_date: '',
           email: '',
           address: '',
@@ -512,6 +553,7 @@ const EmployeeManagementSystem = () => {
       nickname: '',
       gender: 'male',
       age: '',
+      birthday: '',
       hire_date: new Date().toISOString().split('T')[0],
       email: '',
       address: '',
@@ -527,10 +569,12 @@ const EmployeeManagementSystem = () => {
   const closeAddModal = () => {
     setShowAddModal(false);
     setAddForm({
+      staff_id: '',
       name: '',
       nickname: '',
       gender: 'male',
       age: '',
+      birthday: '',
       hire_date: '',
       email: '',
       address: '',
@@ -549,7 +593,7 @@ const EmployeeManagementSystem = () => {
     const hasError = validationErrors[field];
     
     if (!isEditing) {
-      if (field === 'hire_date') {
+      if (field === 'hire_date' || field === 'birthday') {
         return formatDate(staff[field]);
       } else if (field === 'gender') {
         const genderInfo = formatGender(staff.gender);
@@ -564,8 +608,6 @@ const EmployeeManagementSystem = () => {
             {staff.email}
           </a>
         );
-      } else if (field === 'age') {
-        return `${staff.age}`;
       } else if (field === 'position_id') {
         return (
           <span className="position-badge">
@@ -577,9 +619,30 @@ const EmployeeManagementSystem = () => {
       }
       return staff[field] || 'N/A';
     }
-    
+
+    if (field === 'age') {
+      return (
+        <div className="edit-field-container">
+          <input
+            type="number"
+            value={editForm.age || ''}
+            className="edit-input age-readonly"
+            readOnly
+            style={{ 
+              backgroundColor: '#f3f4f6', 
+              color: '#6b7280',
+              cursor: 'not-allowed'
+            }}
+            title="Age is automatically calculated from birthday"
+          />
+          <small style={{ color: '#6b7280', fontSize: '12px' }}>
+            Auto-calculated from birthday
+          </small>
+        </div>
+      );
+    }
+
     if (field === 'gender') {
-      console.log(`Rendering gender select for ${staff.staff_id}, current value:`, value);
       return (
         <select
           value={value || 'male'}
@@ -591,7 +654,7 @@ const EmployeeManagementSystem = () => {
         </select>
       );
     }
-    
+
     return (
       <div className="edit-field-container">
         <input
@@ -633,11 +696,11 @@ const EmployeeManagementSystem = () => {
                 <div className="form-group">
                   <label htmlFor='add-id'>Staff ID <span className="required">*</span></label>
                   <input id='add-id' 
-                  type='number'  
-                  value={addForm.staff_id}
-                  onChange={(e) => handleAddFormChange('staff_id', e.target.value)}
-                  className={addValidationErrors.staff_id ? 'error' : ''}
-                  placeholder="Enter staff id"
+                    type='number'  
+                    value={addForm.staff_id}
+                    onChange={(e) => handleAddFormChange('staff_id', e.target.value)}
+                    className={addValidationErrors.staff_id ? 'error' : ''}
+                    placeholder="Enter staff id"
                   />
                 </div>
 
@@ -680,20 +743,37 @@ const EmployeeManagementSystem = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="add-age">Age *</label>
+                  <label htmlFor="add-birthday">Birthday *</label>
+                  <input
+                    id="add-birthday"
+                    type="date"
+                    value={addForm.birthday}
+                    onChange={(e) => handleAddFormChange('birthday', e.target.value)}
+                    className={addValidationErrors.birthday ? 'error' : ''}
+                  />
+                  {addValidationErrors.birthday && (
+                    <div className="validation-error">{addValidationErrors.birthday}</div>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="add-age">Age (Auto-calculated) *</label> 
                   <input
                     id="add-age"
                     type="number"
                     value={addForm.age}
-                    onChange={(e) => handleAddFormChange('age', e.target.value)}
-                    className={addValidationErrors.age ? 'error' : ''}
-                    min="1"
-                    max="120"
-                    placeholder="Age"
+                    readOnly
+                    style={{ 
+                      backgroundColor: '#f3f4f6', 
+                      color: '#6b7280',
+                      cursor: 'not-allowed'
+                    }}
+                    placeholder="Select birthday to calculate age"
+                    title="Age is automatically calculated from birthday"
                   />
-                  {addValidationErrors.age && (
-                    <div className="validation-error">{addValidationErrors.age}</div>
-                  )}
+                  <small style={{ color: '#6b7280', fontSize: '12px' }}>
+                    Calculated from birthday
+                  </small>
                 </div>
 
                 <div className="form-group">
@@ -839,6 +919,7 @@ const EmployeeManagementSystem = () => {
                 <th>Name</th>
                 <th>Nickname</th>
                 <th>Gender</th>
+                <th>Birthday</th>
                 <th>Age</th>
                 <th>Hire Date</th>
                 <th>Email</th>
@@ -851,15 +932,17 @@ const EmployeeManagementSystem = () => {
               </tr>
             </thead>
             <tbody>
-              {/* 使用 filteredStaffs 進行即時過濾 */}
               {filteredStaffs.map((staff) => (
-                <tr key={staff.staff_id} className={`table-row ${editingStaff === staff.staff_id ? 'editing' : ''}`}>
+                <tr 
+                key={staff.staff_id} 
+                className={`table-row ${editingStaff === staff.staff_id ? 'editing' : ''}`}>
                   <td>
                     <strong className="staff-id">{staff.staff_id}</strong>
                   </td>
                   <td>{renderEditField(staff, 'name')}</td>
                   <td>{renderEditField(staff, 'nickname')}</td>
                   <td>{renderEditField(staff, 'gender')}</td>
+                  <td>{renderEditField(staff, 'birthday', 'date')}</td>
                   <td>{renderEditField(staff, 'age', 'number')}</td>
                   <td>{renderEditField(staff, 'hire_date', 'date')}</td>
                   <td>{renderEditField(staff, 'email', 'email')}</td>
@@ -898,7 +981,7 @@ const EmployeeManagementSystem = () => {
                           <Edit3 size={16} />
                         </button>
                         <button 
-                          onClick={() => deleteRecord(staff.staff_id)}
+                          onClick={() => deleteRecord(parseInt(staff.staff_id))}
                           className="action-btn cancel-btn"
                           title="Delete"
                         >
@@ -961,7 +1044,6 @@ const EmployeeManagementSystem = () => {
   return (
     <div className="app-container">
       <div className="main-card">
-        {/* Header */}
         <div className="header">
           <h1>Employee Management</h1>
         </div>
@@ -969,11 +1051,9 @@ const EmployeeManagementSystem = () => {
 
       <div className="divider" />
 
-        {/* Controls */}
       <div className="main-card">
         <div className="controls">
           <div className="controls-wrapper">
-            {/* Search Box */}
             <div className="search-container">
               <div className="search-input-wrapper">
                 <Search className="search-icon" />
@@ -987,7 +1067,6 @@ const EmployeeManagementSystem = () => {
               </div>
             </div>
 
-            {/* Buttons */}
             <button
               onClick={loadAllStaff}
               disabled={loading}
@@ -1017,7 +1096,6 @@ const EmployeeManagementSystem = () => {
           </div>
         </div>
 
-        {/* Success Message */}
         {successMessage && (
           <div style={{
             padding: '12px 20px',
@@ -1029,13 +1107,11 @@ const EmployeeManagementSystem = () => {
           </div>
         )}
 
-        {/* Content */}
         <div className="content">
           {renderContent()}
         </div>
       </div>
 
-      {/* Add Modal */}
       {renderAddModal()}
     </div>
   );

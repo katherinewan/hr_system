@@ -159,7 +159,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/staff/:id - Delete staff
-router.delete('/:id', async (req, res) => {
+router.delete('/:staff_id', async (req, res) => {
   try {
     const staffId = req.params.id;
     console.log(`Deleting staff ID: ${staffId}`);
