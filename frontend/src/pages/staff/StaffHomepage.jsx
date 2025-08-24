@@ -127,7 +127,7 @@ export default function Homepage() {
         <Route path="/home" element={<DashboardHome />} />
         <Route path="/staff-profile" element={<StaffProfile />} />
         <Route path="/staff-attendance" element={<Attendance />} />
-        <Route path="/leave" element={<Leave />} />
+        <Route path="/leave-management" element={<Leave />} />
         <Route path="/payslip" element={<Payslip />} />
         <Route path="/settings" element={<ComingSoon title="System Settings" />} />
         <Route path="*" element={<StaffDashboard />} />

@@ -1,7 +1,10 @@
-// routes/staffRoutes.js - Updated version (removed work-summary)
+// routes/staffRoutes.js - Clean organized version
 const express = require('express');
 const router = express.Router();
-const { 
+const { authMiddleware } = require('../middleware/auth');
+
+// Import controller functions
+const {
   getAllStaff,
   getStaffById,
   searchStaffByName,
@@ -10,178 +13,87 @@ const {
   deleteStaff,
   getStaffProfile
 } = require('../controllers/staffController');
-const { authMiddleware } = require('../middleware/auth');
 
-console.log('Loading staff routes...');
-console.log('authMiddleware loaded:', typeof authMiddleware);
+console.log('🛣️ Loading staff routes...');
 
 // Request logging middleware
 const logRequest = (req, res, next) => {
-  console.log(`${req.method} ${req.originalUrl} - ${new Date().toLocaleTimeString()}`);
-  console.log('Request params:', req.params);
-  console.log('Query params:', req.query);
+  console.log(`🌐 ${req.method} ${req.originalUrl} - ${new Date().toLocaleTimeString()}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    // Don't log sensitive information
+    const safeBody = { ...req.body };
+    if (safeBody.password) safeBody.password = '***';
+    console.log('📦 Request body:', safeBody);
+  }
   next();
 };
 
-// Apply logging middleware to all routes
+// Apply logging to all routes
 router.use(logRequest);
 
-// ============ Staff Profile Related Routes (requires authentication) ============
+// ===== PUBLIC ROUTES =====
 
-// GET /api/staff/profile - Get logged-in staff profile
-router.get('/profile', (req, res, next) => {
-  console.log('ROUTE HIT: /api/staff/profile');
-  console.log('Auth header present:', !!req.header('Authorization'));
-  next();
-}, authMiddleware, getStaffProfile);
-
-// ============ General Staff Management Routes (public or admin) ============
-
-// GET /api/staff/search?name=search_keyword - Search staff
-router.get('/search', async (req, res) => {
-  try {
-    const { name } = req.query;
-    console.log(`Searching staff: ${name}`);
-    
-    if (!name || !name.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a name to search'
-      });
+// Test route
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Staff routes are working',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      'GET /api/staff': 'Get all staff',
+      'GET /api/staff/search?name=xxx': 'Search staff by name',
+      'GET /api/staff/profile': 'Get authenticated staff profile (requires token)',
+      'GET /api/staff/:id': 'Get staff by ID',
+      'POST /api/staff': 'Create new staff',
+      'PUT /api/staff/:id': 'Update staff',
+      'DELETE /api/staff/:id': 'Delete staff'
     }
-    
-    await searchStaffByName(req, res);
-    
-  } catch (error) {
-    console.error('Error searching staff:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Staff search failed',
-      error: error.message
-    });
-  }
+  });
 });
 
-// GET /api/staff - Get all staff
-router.get('/', async (req, res) => {
-  try {
-    console.log('Getting all staff data...');
-    
-    await getAllStaff(req, res);
-    
-  } catch (error) {
-    console.error('Error retrieving staff data:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve staff data',
-      error: error.message
-    });
-  }
-});
+// Search staff by name - MUST come before /:id route
+router.get('/search', searchStaffByName);
 
-// GET /api/staff/:id - Get single staff by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const staffId = req.params.id;
-    console.log(`Getting staff ID: ${staffId}`);
-    
-    // Validate ID format
-    if (!/^\d+$/.test(staffId)) {
-      console.log(`Invalid staff ID format: ${staffId}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid staff ID format'
-      });
-    }
-    
-    await getStaffById(req, res);
-    
-  } catch (error) {
-    console.error('Error retrieving staff data:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve staff data',
-      error: error.message
-    });
-  }
-});
+// Get all staff
+router.get('/', getAllStaff);
 
-// POST /api/staff - Create staff
-router.post('/', async (req, res) => {
-  try {
-    const { name } = req.body;
-    console.log('Creating staff:', name);
-    
-    await createStaff(req, res);
-    
-  } catch (error) {
-    console.error('Error creating staff:', error);
-    
-    if (error.code === '23505') {
-      return res.status(400).json({
-        success: false,
-        message: 'This email or phone number is already in use'
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create staff',
-      error: error.message
-    });
-  }
-});
+// ===== AUTHENTICATED ROUTES =====
 
-// PUT /api/staff/:id - Update staff data
-router.put('/:id', async (req, res) => {
-  try {
-    const staffId = req.params.id;
-    console.log(`Updating staff ID: ${staffId}`);
-    
-    // Validate ID format
-    if (!/^\d+$/.test(staffId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid staff ID format'
-      });
-    }
-    
-    await updateStaff(req, res);
-    
-  } catch (error) {
-    console.error('Error updating staff:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update staff data',
-      error: error.message
-    });
-  }
-});
+// Get authenticated staff profile (requires valid JWT token)
+router.get('/profile', authMiddleware, getStaffProfile);
 
-// DELETE /api/staff/:id - Delete staff
-router.delete('/:staff_id', async (req, res) => {
-  try {
-    const staffId = req.params.id;
-    console.log(`Deleting staff ID: ${staffId}`);
-    
-    // Validate ID format
-    if (!/^\d+$/.test(staffId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid staff ID format'
-      });
-    }
-    
-    await deleteStaff(req, res);
-    
-  } catch (error) {
-    console.error('Error deleting staff:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete staff',
-      error: error.message
-    });
-  }
+// ===== CRUD ROUTES =====
+
+// Get single staff by ID
+router.get('/:id', getStaffById);
+
+// Create new staff
+router.post('/', createStaff);
+
+// Update staff
+router.put('/:id', updateStaff);
+
+// Delete staff
+router.delete('/:id', deleteStaff);
+
+// ===== ERROR HANDLING =====
+
+// Handle 404 for staff routes
+router.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Staff route not found',
+    path: req.originalUrl,
+    availableRoutes: [
+      'GET /api/staff',
+      'GET /api/staff/search?name=xxx',
+      'GET /api/staff/profile (requires auth)',
+      'GET /api/staff/:id',
+      'POST /api/staff',
+      'PUT /api/staff/:id',
+      'DELETE /api/staff/:id'
+    ]
+  });
 });
 
 module.exports = router;

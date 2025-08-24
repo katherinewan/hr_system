@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, MapPin, Calendar, Building, Award, AlertCircle } from 'lucide-react';
-import '../../styles/StaffProfile.css';
+import { User, Phone, Mail, MapPin, Calendar, Building, Award, AlertCircle, Loader } from 'lucide-react';
 
 const StaffProfile = () => {
   const [profileData, setProfileData] = useState(null);
@@ -95,8 +94,6 @@ const StaffProfile = () => {
   const handleRetry = () => {
     fetchProfileData();
   };
-
-
 
   const renderLoadingState = () => (
     <div className="staff-profile-container">

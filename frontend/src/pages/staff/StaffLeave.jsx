@@ -27,17 +27,23 @@ const StaffLeave = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Current user (這裡假設從認證系統獲取)
+  // Current user (should get from JWT token or context)
   const currentUser = {
-    staff_id: 100001, // 應該從 JWT token 或 context 獲取
+    staff_id: 100001,
     name: "John Doe",
     email: "john.doe@company.com",
     role: "Employee"
   };
 
-  // Fetch leave quota and requests
+  // Mock data for testing
   useEffect(() => {
-    fetchLeaveData();
+    setLeaveQuota({
+      al_remaining: 15,
+      sl_remaining: 10,
+      cl_remaining: 5
+    });
+    setLeaveRequests([]);
+    setLoading(false);
   }, []);
 
   const fetchLeaveData = async () => {
@@ -59,7 +65,7 @@ const StaffLeave = () => {
       }
 
     } catch (err) {
-      setError('無法載入假期資料');
+      setError('Unable to load leave data');
       console.error('Error fetching leave data:', err);
     } finally {
       setLoading(false);
@@ -110,12 +116,11 @@ const StaffLeave = () => {
         if (result.success) {
           setShowApplyModal(false);
           fetchLeaveData(); // Refresh data
-          // Show success message (你可以添加 toast notification)
         } else {
-          setFormError(result.message || '申請失敗');
+          setFormError(result.message || 'Application failed');
         }
       } catch (err) {
-        setFormError('網路錯誤，請稍後再試');
+        setFormError('Network error, please try again');
       } finally {
         setSubmitting(false);
       }
@@ -126,150 +131,154 @@ const StaffLeave = () => {
     return (
       <div className="modal-overlay" onClick={() => setShowApplyModal(false)}>
         <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <div className="modal-header-content">
-              <div className="modal-title-section">
-                <h3 className="modal-title-with-icon">
+          <div className="profile-header">
+            <div className="header-content">
+              <div className="user-info">
+                <div className="avatar">
                   <FileText size={24} />
-                  申請假期
-                </h3>
-                <p>請填寫以下資訊提交假期申請</p>
+                </div>
+                <div className="user-details">
+                  <h1 className="user-name">Apply for Leave</h1>
+                  <p className="user-position">Please fill in the following information to submit your leave application</p>
+                </div>
               </div>
-              <button 
-                className="close-btn" 
-                onClick={() => setShowApplyModal(false)}
-                disabled={submitting}
-              >
-                ×
-              </button>
+              <div className="action-buttons">
+                <button 
+                  className="cancel-button" 
+                  onClick={() => setShowApplyModal(false)}
+                  disabled={submitting}
+                >
+                  ×
+                </button>
+              </div>
             </div>
           </div>
 
-          <div>
-            <div className="modal-body">
-              {formError && (
-                <div className="error-message">
-                  <AlertCircle size={16} />
-                  {formError}
-                </div>
-              )}
+          <div className="profile-content">
+            {formError && (
+              <div className="error-banner">
+                <AlertCircle size={16} />
+                <span>{formError}</span>
+              </div>
+            )}
 
-              <div className="salary-form-grid">
-                <div className="form-group">
-                  <label className="form-label-with-icon">
-                    <Calendar size={16} />
-                    假期類型 <span className="required">*</span>
-                  </label>
+            <div className="info-grid">
+              <div className="info-item">
+                <Calendar size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Leave Type *</p>
                   <select
-                    className="form-select"
+                    className="edit-input"
                     value={formData.leave_type}
                     onChange={(e) => setFormData({...formData, leave_type: e.target.value})}
                     required
                   >
-                    <option value="casual_leave">事假</option>
-                    <option value="sick_leave">病假</option>
-                    <option value="annual_leave">年假</option>
-                    <option value="maternity_leave">產假</option>
-                    <option value="paternity_leave">陪產假</option>
+                    <option value="casual_leave">Casual Leave</option>
+                    <option value="sick_leave">Sick Leave</option>
+                    <option value="annual_leave">Annual Leave</option>
+                    <option value="maternity_leave">Maternity Leave</option>
+                    <option value="paternity_leave">Paternity Leave</option>
                   </select>
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label className="form-label-with-icon">
-                    <Calendar size={16} />
-                    開始日期 <span className="required">*</span>
-                  </label>
+              <div className="info-item">
+                <Calendar size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Start Date *</p>
                   <input
                     type="date"
-                    className="form-input"
+                    className="edit-input"
                     value={formData.start_date}
                     onChange={(e) => setFormData({...formData, start_date: e.target.value})}
                     required
                   />
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label className="form-label-with-icon">
-                    <Calendar size={16} />
-                    結束日期 <span className="required">*</span>
-                  </label>
+              <div className="info-item">
+                <Calendar size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">End Date *</p>
                   <input
                     type="date"
-                    className="form-input"
+                    className="edit-input"
                     value={formData.end_date}
                     onChange={(e) => setFormData({...formData, end_date: e.target.value})}
                     required
                   />
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label className="form-label-with-icon">
-                    <Phone size={16} />
-                    緊急聯絡電話
-                  </label>
+              <div className="info-item">
+                <Phone size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Emergency Contact</p>
                   <input
                     type="tel"
-                    className="form-input"
+                    className="edit-input"
                     value={formData.emergency_contact}
                     onChange={(e) => setFormData({...formData, emergency_contact: e.target.value})}
-                    placeholder="選填"
+                    placeholder="Optional"
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label-with-icon">
-                  <FileText size={16} />
-                  請假原因 <span className="required">*</span>
-                </label>
+            <div className="address-item">
+              <FileText size={20} className="info-icon" />
+              <div className="info-content">
+                <p className="info-label">Reason for Leave *</p>
                 <textarea
-                  className="form-input"
+                  className="edit-textarea"
                   rows="4"
                   value={formData.reason}
                   onChange={(e) => setFormData({...formData, reason: e.target.value})}
-                  placeholder="請詳細說明請假原因..."
+                  placeholder="Please provide detailed reason for leave..."
                   required
                 />
               </div>
+            </div>
 
-              {formData.leave_type === 'sick_leave' && (
-                <div className="form-group">
+            {formData.leave_type === 'sick_leave' && (
+              <div className="info-item">
+                <div className="info-content">
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
                       type="checkbox"
                       checked={formData.medical_certificate}
                       onChange={(e) => setFormData({...formData, medical_certificate: e.target.checked})}
                     />
-                    已提供醫生證明
+                    <span className="info-label">Medical certificate provided</span>
                   </label>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="modal-footer">
+            <div className="action-buttons" style={{ marginTop: '2rem' }}>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="cancel-button"
                 onClick={() => setShowApplyModal(false)}
                 disabled={submitting}
               >
-                取消
+                Cancel
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="save-button"
                 onClick={handleSubmit}
                 disabled={submitting}
               >
                 {submitting ? (
                   <>
                     <Loader size={16} className="animate-spin" />
-                    提交中...
+                    Submitting...
                   </>
                 ) : (
                   <>
                     <CheckCircle size={16} />
-                    提交申請
+                    Submit Application
                   </>
                 )}
               </button>
@@ -287,122 +296,160 @@ const StaffLeave = () => {
     return (
       <div className="modal-overlay" onClick={() => setSelectedRequest(null)}>
         <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <div className="modal-header-content">
-              <div className="modal-title-section">
-                <h3 className="modal-title-with-icon">
+          <div className="profile-header">
+            <div className="header-content">
+              <div className="user-info">
+                <div className="avatar">
                   <FileText size={24} />
-                  申請詳情
-                </h3>
-                <p>申請編號: {selectedRequest.request_id}</p>
+                </div>
+                <div className="user-details">
+                  <h1 className="user-name">Application Details</h1>
+                  <p className="user-position">Application ID: {selectedRequest.request_id}</p>
+                </div>
               </div>
-              <button 
-                className="close-btn" 
-                onClick={() => setSelectedRequest(null)}
-              >
-                ×
-              </button>
+              <div className="action-buttons">
+                <button 
+                  className="cancel-button" 
+                  onClick={() => setSelectedRequest(null)}
+                >
+                  ×
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="modal-body">
-            <div className="salary-form-grid">
-              <div className="form-group">
-                <label>假期類型</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  {getLeaveTypeLabel(selectedRequest.leave_type)}
+          <div className="profile-content">
+            <div className="info-grid">
+              <div className="info-item">
+                <Calendar size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Leave Type</p>
+                  <p className="info-value">{getLeaveTypeLabel(selectedRequest.leave_type)}</p>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>申請狀態</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  <span className={`status-badge ${selectedRequest.status.toLowerCase()}`}>
-                    {getStatusLabel(selectedRequest.status)}
-                  </span>
+              <div className="info-item">
+                <AlertCircle size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Status</p>
+                  <p className="info-value">
+                    <span className={`status-badge ${getStatusBadgeClass(selectedRequest.status)}`}>
+                      {getStatusLabel(selectedRequest.status)}
+                    </span>
+                  </p>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>開始日期</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  {new Date(selectedRequest.start_date).toLocaleDateString('zh-TW')}
+              <div className="info-item">
+                <Calendar size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Start Date</p>
+                  <p className="info-value">
+                    {new Date(selectedRequest.start_date).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>結束日期</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  {new Date(selectedRequest.end_date).toLocaleDateString('zh-TW')}
+              <div className="info-item">
+                <Calendar size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">End Date</p>
+                  <p className="info-value">
+                    {new Date(selectedRequest.end_date).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>請假天數</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  {selectedRequest.total_days} 天
+              <div className="info-item">
+                <Clock size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Total Days</p>
+                  <p className="info-value">{selectedRequest.total_days} days</p>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>申請日期</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  {new Date(selectedRequest.applied_on).toLocaleDateString('zh-TW')}
+              <div className="info-item">
+                <Calendar size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Application Date</p>
+                  <p className="info-value">
+                    {new Date(selectedRequest.applied_on).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="form-group">
-              <label>請假原因</label>
-              <div className="form-input" style={{ background: '#f8f9fa', minHeight: '80px' }}>
-                {selectedRequest.reason}
+            <div className="address-item">
+              <FileText size={20} className="info-icon" />
+              <div className="info-content">
+                <p className="info-label">Reason for Leave</p>
+                <div className="info-value" style={{ 
+                  minHeight: '80px', 
+                  padding: '1rem', 
+                  background: '#f8f9fa', 
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  {selectedRequest.reason}
+                </div>
               </div>
             </div>
 
             {selectedRequest.emergency_contact && (
-              <div className="form-group">
-                <label>緊急聯絡電話</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  {selectedRequest.emergency_contact}
+              <div className="info-item">
+                <Phone size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Emergency Contact</p>
+                  <p className="info-value">{selectedRequest.emergency_contact}</p>
                 </div>
               </div>
             )}
 
             {selectedRequest.rejection_reason && (
-              <div className="form-group">
-                <label>拒絕原因</label>
-                <div className="form-input" style={{ background: '#fee2e2', border: '1px solid #fca5a5' }}>
-                  {selectedRequest.rejection_reason}
+              <div className="address-item">
+                <AlertCircle size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Rejection Reason</p>
+                  <div className="info-value" style={{ 
+                    background: '#fee2e2', 
+                    border: '1px solid #fca5a5', 
+                    padding: '1rem', 
+                    borderRadius: '0.5rem' 
+                  }}>
+                    {selectedRequest.rejection_reason}
+                  </div>
                 </div>
               </div>
             )}
 
             {selectedRequest.approved_by_name && (
-              <div className="form-group">
-                <label>審核人員</label>
-                <div className="form-input" style={{ background: '#f8f9fa' }}>
-                  {selectedRequest.approved_by_name}
+              <div className="info-item">
+                <User size={20} className="info-icon" />
+                <div className="info-content">
+                  <p className="info-label">Approved By</p>
+                  <p className="info-value">{selectedRequest.approved_by_name}</p>
                 </div>
               </div>
             )}
-          </div>
 
-          <div className="modal-footer">
-            <button
-              className="btn btn-secondary"
-              onClick={() => setSelectedRequest(null)}
-            >
-              關閉
-            </button>
-            {selectedRequest.status === 'Pending' && (
+            <div className="action-buttons" style={{ marginTop: '2rem' }}>
               <button
-                className="btn btn-danger"
-                onClick={() => handleCancelRequest(selectedRequest.request_id)}
+                className="cancel-button"
+                onClick={() => setSelectedRequest(null)}
               >
-                <XCircle size={16} />
-                取消申請
+                Close
               </button>
-            )}
+              {selectedRequest.status === 'Pending' && (
+                <button
+                  className="cancel-button"
+                  onClick={() => handleCancelRequest(selectedRequest.request_id)}
+                  style={{ background: '#dc2626', color: 'white' }}
+                >
+                  <XCircle size={16} />
+                  Cancel Application
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -419,7 +466,7 @@ const StaffLeave = () => {
         },
         body: JSON.stringify({
           staff_id: currentUser.staff_id,
-          reason: '員工主動取消'
+          reason: 'Staff initiated cancellation'
         })
       });
 
@@ -435,21 +482,21 @@ const StaffLeave = () => {
   // Helper functions
   const getLeaveTypeLabel = (type) => {
     const labels = {
-      'sick_leave': '病假',
-      'annual_leave': '年假',
-      'casual_leave': '事假',
-      'maternity_leave': '產假',
-      'paternity_leave': '陪產假'
+      'sick_leave': 'Sick Leave',
+      'annual_leave': 'Annual Leave',
+      'casual_leave': 'Casual Leave',
+      'maternity_leave': 'Maternity Leave',
+      'paternity_leave': 'Paternity Leave'
     };
     return labels[type] || type;
   };
 
   const getStatusLabel = (status) => {
     const labels = {
-      'Pending': '待審核',
-      'Approved': '已批准',
-      'Rejected': '已拒絕',
-      'Cancelled': '已取消'
+      'Pending': 'Pending Review',
+      'Approved': 'Approved',
+      'Rejected': 'Rejected',
+      'Cancelled': 'Cancelled'
     };
     return labels[status] || status;
   };
@@ -466,10 +513,10 @@ const StaffLeave = () => {
 
   if (loading) {
     return (
-      <div className="main-card">
-        <div className="loading-state">
-          <Loader size={48} className="animate-spin" />
-          <div>載入假期資料中...</div>
+      <div className="staff-profile-container">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading leave data...</p>
         </div>
       </div>
     );
@@ -477,195 +524,254 @@ const StaffLeave = () => {
 
   if (error) {
     return (
-      <div className="main-card">
-        <div className="error-message">
-          <AlertCircle size={20} />
-          {error}
+      <div className="staff-profile-container">
+        <div className="profile-card">
+          <div className="profile-header">
+            <div className="header-content">
+              <div className="user-info">
+                <div className="avatar">
+                  <FileText size={32} />
+                </div>
+                <div className="user-details">
+                  <h1 className="user-name">Leave Management</h1>
+                  <p className="user-position">Unable to load leave data</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="profile-content">
+            <div className="error-message">
+              <AlertCircle size={20} />
+              <span>{error}</span>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="main-card">
-      {/* Header */}
-      <div className="header">
-        <h1>假期管理</h1>
-        <p>管理您的假期申請和查看假期餘額</p>
-      </div>
-
-      {/* Leave Quota Dashboard */}
-      {leaveQuota && (
-        <div className="salary-stats-dashboard">
-          <div className="stats-header">
-            <h3>假期餘額總覽</h3>
-          </div>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon total">
-                <Calendar size={24} />
-              </div>
-              <div className="stat-content">
-                <div className="stat-value">{leaveQuota.al_remaining || 0}</div>
-                <div className="stat-label">年假餘額</div>
+    <div className="staff-profile-container">
+      <div className="profile-card">
+        {/* Header */}
+        <div className="profile-header">
+          <div className="header-content">
+            <div className="user-info">
+              <div className="user-details">
+                <h1 className="user-name">My Leave Management</h1>
               </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-icon average">
-                <Clock size={24} />
-              </div>
-              <div className="stat-content">
-                <div className="stat-value">{leaveQuota.sl_remaining || 0}</div>
-                <div className="stat-label">病假餘額</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon highest">
-                <FileText size={24} />
-              </div>
-              <div className="stat-content">
-                <div className="stat-value">{leaveQuota.cl_remaining || 0}</div>
-                <div className="stat-label">事假餘額</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon employees">
-                <User size={24} />
-              </div>
-              <div className="stat-content">
-                <div className="stat-value">{leaveRequests.filter(r => r.status === 'Pending').length}</div>
-                <div className="stat-label">待審核申請</div>
-              </div>
+            <div className="action-buttons">
+              <button
+                className="edit-button"
+                onClick={() => setShowApplyModal(true)}
+              >
+                <Plus size={20} />
+                Apply for Leave
+              </button>
             </div>
           </div>
         </div>
-      )}
 
-      {/* Controls */}
-      <div className="controls">
-        <div className="controls-wrapper">
-          <div className="search-container">
-            <div className="search-input-wrapper">
-              <Search className="search-icon" size={20} />
+        {/* Leave Quota Dashboard */}
+        {leaveQuota && (
+          <div className="profile-content" style={{ paddingBottom: 0 }}>
+            <h2 className="section-title">Leave Balance Overview</h2>
+            <div className="info-card">
+              <div className="info-grid">
+                <div className="info-item">
+                  <div className="info-icon">
+                    <Calendar size={24} color="#10b981" />
+                  </div>
+                  <div className="info-content">
+                    <p className="info-label">Annual Leave Balance</p>
+                    <p className="info-value">{leaveQuota.al_remaining || 0} days</p>
+                  </div>
+                </div>
+
+                <div className="info-item">
+                  <div className="info-icon">
+                    <Clock size={24} color="#3b82f6" />
+                  </div>
+                  <div className="info-content">
+                    <p className="info-label">Sick Leave Balance</p>
+                    <p className="info-value">{leaveQuota.sl_remaining || 0} days</p>
+                  </div>
+                </div>
+
+                <div className="info-item">
+                  <div className="info-icon">
+                    <FileText size={24} color="#f59e0b" />
+                  </div>
+                  <div className="info-content">
+                    <p className="info-label">Casual Leave Balance</p>
+                    <p className="info-value">{leaveQuota.cl_remaining || 0} days</p>
+                  </div>
+                </div>
+
+                <div className="info-item">
+                  <div className="info-icon">
+                    <User size={24} color="#8b5cf6" />
+                  </div>
+                  <div className="info-content">
+                    <p className="info-label">Pending Applications</p>
+                    <p className="info-value">{leaveRequests.filter(r => r.status === 'Pending').length}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="profile-content" style={{ paddingTop: 0, paddingBottom: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
+              <Search size={20} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
               <input
                 type="text"
-                className="search-input"
-                placeholder="搜尋假期類型或原因..."
+                className="edit-input"
+                style={{ paddingLeft: '2.5rem' }}
+                placeholder="Search leave type or reason..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          </div>
 
-          <div className="filter-container">
             <select
-              className="search-input"
+              className="edit-input"
+              style={{ minWidth: '150px' }}
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">所有狀態</option>
-              <option value="pending">待審核</option>
-              <option value="approved">已批准</option>
-              <option value="rejected">已拒絕</option>
-              <option value="cancelled">已取消</option>
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
-
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowApplyModal(true)}
-          >
-            <Plus size={20} className="btn-icon" />
-            申請假期
-          </button>
         </div>
+
+        {/* Content */}
+        <div className="profile-content">
+          <h2 className="section-title">
+            My Leave Applications ({filteredRequests.length})
+          </h2>
+
+          {filteredRequests.length === 0 ? (
+            <div className="info-card">
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                <h3 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>No Application Records Found</h3>
+                <p style={{ margin: '0' }}>You haven't submitted any leave applications yet, or no records match your search criteria</p>
+              </div>
+            </div>
+          ) : (
+            <div className="info-card">
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)' }}>
+                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Application ID</th>
+                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leave Type</th>
+                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date Range</th>
+                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</th>
+                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Applied Date</th>
+                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                      <th style={{ padding: '1rem 0.75rem', textAlign: 'center', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRequests.map((request) => (
+                      <tr key={request.request_id} style={{ transition: 'background-color 0.2s ease' }} onMouseEnter={e => e.target.closest('tr').style.backgroundColor = '#f9fafb'} onMouseLeave={e => e.target.closest('tr').style.backgroundColor = 'transparent'}>
+                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
+                          <span style={{ 
+                            fontWeight: '700', 
+                            color: '#254E70', 
+                            background: 'rgba(37, 78, 112, 0.1)', 
+                            padding: '0.25rem 0.5rem', 
+                            borderRadius: '0.375rem', 
+                            fontSize: '0.75rem' 
+                          }}>
+                            #{request.request_id}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
+                          <span style={{
+                            background: '#e9eb9e',
+                            color: '#2e382e',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.375rem',
+                            fontWeight: '600',
+                            fontSize: '0.75rem'
+                          }}>
+                            {getLeaveTypeLabel(request.leave_type)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
+                          <div style={{ fontSize: '0.875rem' }}>
+                            <div>{new Date(request.start_date).toLocaleDateString()}</div>
+                            <div style={{ color: '#6b7280' }}>
+                              to {new Date(request.end_date).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
+                          <span style={{ fontWeight: '600' }}>{request.total_days} days</span>
+                        </td>
+                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
+                          {new Date(request.applied_on).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
+                          <span className={`status-badge ${getStatusBadgeClass(request.status)}`}>
+                            {getStatusLabel(request.status)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                            <button
+                              className="edit-button"
+                              style={{ 
+                                padding: '0.25rem 0.5rem', 
+                                fontSize: '0.75rem',
+                                minWidth: 'auto'
+                              }}
+                              onClick={() => setSelectedRequest(request)}
+                              title="View Details"
+                            >
+                              <FileText size={14} />
+                            </button>
+                            {request.status === 'Pending' && (
+                              <button
+                                className="cancel-button"
+                                style={{ 
+                                  padding: '0.25rem 0.5rem', 
+                                  fontSize: '0.75rem',
+                                  minWidth: 'auto',
+                                  background: '#dc2626',
+                                  color: 'white'
+                                }}
+                                onClick={() => handleCancelRequest(request.request_id)}
+                                title="Cancel Application"
+                              >
+                                <XCircle size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modals */}
+        <LeaveApplicationModal />
+        <RequestDetailsModal />
       </div>
-
-      {/* Content */}
-      <div className="content">
-        <h2 className="result-title">
-          我的假期申請 ({filteredRequests.length})
-        </h2>
-
-        {filteredRequests.length === 0 ? (
-          <div className="empty-state">
-            <FileText size={64} />
-            <h3>沒有找到申請記錄</h3>
-            <p>您還沒有任何假期申請，或者沒有符合篩選條件的記錄</p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="staff-table">
-              <thead className="table-header">
-                <tr>
-                  <th>申請編號</th>
-                  <th>假期類型</th>
-                  <th>日期</th>
-                  <th>天數</th>
-                  <th>申請日期</th>
-                  <th>狀態</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRequests.map((request) => (
-                  <tr key={request.request_id} className="table-row">
-                    <td>
-                      <span className="staff-id">#{request.request_id}</span>
-                    </td>
-                    <td>
-                      <span className="position-badge">
-                        {getLeaveTypeLabel(request.leave_type)}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.875rem' }}>
-                        <div>{new Date(request.start_date).toLocaleDateString('zh-TW')}</div>
-                        <div style={{ color: '#6b7280' }}>
-                          至 {new Date(request.end_date).toLocaleDateString('zh-TW')}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="font-semibold">{request.total_days} 天</span>
-                    </td>
-                    <td>
-                      {new Date(request.applied_on).toLocaleDateString('zh-TW')}
-                    </td>
-                    <td>
-                      <span className={`status-badge ${getStatusBadgeClass(request.status)}`}>
-                        {getStatusLabel(request.status)}
-                      </span>
-                    </td>
-                    <td className="actions-cell">
-                      <button
-                        className="action-btn edit-btn"
-                        onClick={() => setSelectedRequest(request)}
-                        title="查看詳情"
-                      >
-                        <FileText size={16} />
-                      </button>
-                      {request.status === 'Pending' && (
-                        <button
-                          className="action-btn cancel-btn"
-                          onClick={() => handleCancelRequest(request.request_id)}
-                          title="取消申請"
-                        >
-                          <XCircle size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Modals */}
-      <LeaveApplicationModal />
-      <RequestDetailsModal />
     </div>
   );
 };

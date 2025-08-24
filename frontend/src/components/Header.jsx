@@ -125,7 +125,7 @@ export default function ButtonAppBar() {
 
   const menuItems = [
     { text: 'Dashboard', icon: <Home />, path: '/hr/', category: 'main' },
-    { text: 'Employee Management', icon: <Users />, path: '/hr/staffs', category: 'hr' },
+    { text: 'Employee Management', icon: <Users />, path: '/hr/staff', category: 'hr' },
     { text: 'User Accounts', icon: <ContactRound />, path: '/hr/user-accounts', category: 'hr' },
     { text: 'Attendance', icon: <Calendar />, path: '/hr/attendance', category: 'hr' }, 
     { text: 'Leave Management', icon: <FileHeart />, path: '/hr/leave-management', category: 'hr' }, 

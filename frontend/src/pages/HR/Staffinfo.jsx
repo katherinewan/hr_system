@@ -71,7 +71,7 @@ const EmployeeManagementSystem = () => {
     
     try {
       console.log('Loading staff data...');
-      const response = await fetch(`${API_BASE_URL}/staffs`);
+      const response = await fetch(`${API_BASE_URL}/staff`);
       const data = await response.json();
       
       console.log('API response:', data);
@@ -113,12 +113,12 @@ const EmployeeManagementSystem = () => {
       
       if (/^\d+$/.test(trimmedInput)) {
         console.log(`Searching staff ID: ${trimmedInput}`);
-        response = await fetch(`${API_BASE_URL}/staffs/${trimmedInput}`);
+        response = await fetch(`${API_BASE_URL}/staff/${trimmedInput}`);
       } else {
         console.log(`Searching staff name: ${trimmedInput}`);
         const params = new URLSearchParams();
         params.append('name', trimmedInput);
-        response = await fetch(`${API_BASE_URL}/staffs/search?${params.toString()}`);
+        response = await fetch(`${API_BASE_URL}/staff/search?${params.toString()}`);
       }
       
       const data = await response.json();
@@ -240,7 +240,8 @@ const EmployeeManagementSystem = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/staffs/${parseInt(staffID)}`, {
+      // Remove parseInt() - send staffID as string since the route expects string parameter
+      const response = await fetch(`${API_BASE_URL}/staff/${staffID}`, {
         method: 'DELETE'
       });
 
@@ -248,7 +249,7 @@ const EmployeeManagementSystem = () => {
 
       if (data.success) {
         showSuccess('Staff member deleted successfully');
-        loadAllStaff();
+        loadAllStaff(); // Refresh the list
       } else {
         setError(data.message || 'Delete failed');
       }
@@ -450,7 +451,7 @@ const EmployeeManagementSystem = () => {
       console.log('Updating staff with complete data:', completeData);
       console.log('Staff ID:', staffID);
       
-      const response = await fetch(`${API_BASE_URL}/staffs/${staffID}`, {
+      const response = await fetch(`${API_BASE_URL}/staff/${staffID}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -502,7 +503,7 @@ const EmployeeManagementSystem = () => {
         position_id: addForm.position_id
       };
 
-      const response = await fetch(`${API_BASE_URL}/staffs`, {
+      const response = await fetch(`${API_BASE_URL}/staff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -981,7 +982,7 @@ const EmployeeManagementSystem = () => {
                           <Edit3 size={16} />
                         </button>
                         <button 
-                          onClick={() => deleteRecord(parseInt(staff.staff_id))}
+                          onClick={() => deleteRecord(staff.staff_id)}  // 修正後的代碼
                           className="action-btn cancel-btn"
                           title="Delete"
                         >

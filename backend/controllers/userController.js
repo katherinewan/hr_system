@@ -585,6 +585,74 @@ const updateUser = async (req, res) => {
   }
 };
 
+// Add this function to your userController.js file
+
+const deleteUser = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    console.log('🗑️ Request: Delete user, User ID:', user_id);
+
+    // Validate required parameters
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide user ID'
+      });
+    }
+
+    // Check if user exists before deletion
+    const userCheck = await pool.query(
+      'SELECT user_id, staff_id FROM user_accounts WHERE user_id = $1',
+      [user_id]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const userToDelete = userCheck.rows[0];
+
+    // Delete the user account
+    const result = await pool.query(
+      'DELETE FROM user_accounts WHERE user_id = $1 RETURNING user_id, staff_id',
+      [user_id]
+    );
+
+    console.log(`✅ Successfully deleted user account, ID: ${user_id}, Staff ID: ${userToDelete.staff_id}`);
+
+    res.json({
+      success: true,
+      message: 'User account deleted successfully',
+      data: {
+        deleted_user_id: result.rows[0].user_id,
+        deleted_staff_id: result.rows[0].staff_id
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error deleting user:', error);
+    
+    // Provide specific error messages
+    let errorMessage = 'Failed to delete user account';
+    
+    if (error.code === '23503') {
+      errorMessage = 'Cannot delete user account - it is referenced by other records';
+    } else if (error.code === '42P01') {
+      errorMessage = 'user_accounts table does not exist';
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: errorMessage,
+      error: error.message,
+      errorCode: error.code
+    });
+  }
+};
+
+// Update the module.exports to include deleteUser
 module.exports = {
   getAllUsers,
   searchUsersByName,
@@ -593,5 +661,6 @@ module.exports = {
   changePassword,
   updateUserRole,
   toggleUserLock,
-  updateUser
+  updateUser,
+  deleteUser  // Add this line
 };

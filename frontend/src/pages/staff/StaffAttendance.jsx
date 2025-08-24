@@ -33,7 +33,6 @@ const StaffAttendance = () => {
         return;
       }
 
-      // 修正：使用正確的API端點獲取員工自己的出勤記錄
       console.log('Fetching attendance from:', `${API_BASE_URL}/attendance/my-records`);
       console.log('Token present:', !!token);
 
@@ -61,7 +60,6 @@ const StaffAttendance = () => {
       console.log('Attendance data received:', data);
 
       if (data.success) {
-        // 修正：設置出勤數據而不是profile數據
         setAttendanceData(data.data);
         setError('');
       } else {
@@ -71,12 +69,8 @@ const StaffAttendance = () => {
       console.error('Attendance fetch error:', err);
       setError(err.message || 'Error loading attendance data');
       
-      // If authentication failed, redirect to login
       if (err.message.includes('session') || err.message.includes('login')) {
-        // Clear invalid token
         localStorage.removeItem('authToken');
-        // You can redirect to login page here if needed
-        // window.location.href = '/login';
       }
     } finally {
       setLoading(false);
@@ -90,7 +84,7 @@ const StaffAttendance = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'Not set';
     try {
-      return new Date(dateString).toLocaleDateString('en-GB'); // 使用 DD/MM/YYYY 格式
+      return new Date(dateString).toLocaleDateString('en-GB');
     } catch (err) {
       return 'Invalid date';
     }
@@ -99,7 +93,6 @@ const StaffAttendance = () => {
   const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
     try {
-      // 如果時間格式是 HH:mm:ss，只顯示 HH:mm
       return timeString.substring(0, 5);
     } catch (err) {
       return timeString;
@@ -113,23 +106,23 @@ const StaffAttendance = () => {
 
   const getStatusBadge = (status) => {
     const statusColors = {
-      'Present': 'status-present',
-      'Absent': 'status-absent', 
-      'Late': 'status-late',
-      'Sick Leave': 'status-sick',
-      'Annual Leave': 'status-leave',
-      'Overtime': 'status-overtime'
+      'Present': 'status-badge active',
+      'Absent': 'status-badge locked', 
+      'Late': 'status-badge warning',
+      'Sick Leave': 'status-badge default',
+      'Annual Leave': 'status-badge default',
+      'Overtime': 'status-badge active'
     };
 
     return (
-      <span className={`status-badge ${statusColors[status] || 'status-default'}`}>
+      <span className={statusColors[status] || 'status-badge default'}>
         {status}
       </span>
     );
   };
 
   const renderLoadingState = () => (
-    <div className="staff-attendance-container">
+    <div className="staff-profile-container">
       <div className="loading-container">
         <div className="loading-spinner"></div>
         <p>Loading your attendance...</p>
@@ -151,9 +144,9 @@ const StaffAttendance = () => {
   // If there's an error and no attendance data
   if (error && !attendanceData) {
     return (
-      <div className="staff-attendance-container">
-        <div className="attendance-card">
-          <div className="attendance-header">
+      <div className="staff-profile-container">
+        <div className="profile-card">
+          <div className="profile-header">
             <div className="header-content">
               <div className="user-info">
                 <div className="avatar">
@@ -166,9 +159,9 @@ const StaffAttendance = () => {
               </div>
             </div>
           </div>
-          <div className="error-section">
+          <div className="profile-content">
             {renderErrorMessage(error)}
-            <div className="error-actions">
+            <div className="error-actions" style={{ marginTop: '1rem' }}>
               <button 
                 className="retry-button"
                 onClick={handleRetry}
@@ -183,61 +176,81 @@ const StaffAttendance = () => {
   }
 
   return (
-    <div className="staff-attendance-container">
-      <div className="attendance-header">
-        <h2>My Attendance Records</h2>
-        <button 
-          className="refresh-button"
-          onClick={handleRetry}
-        >
-          Refresh
-        </button>
+    <div className="staff-profile-container">
+      <div className="profile-card">
+        {/* Header */}
+        <div className="profile-header">
+          <div className="header-content">
+            <div className="user-info">
+              <div className="user-details">
+                <h1 className="user-name">My Attendance Records</h1>
+              </div>
+            </div>
+            <div className="action-buttons">
+              <button 
+                className="edit-button"
+                onClick={handleRetry}
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="error-banner">
+            {renderErrorMessage(error, 'warning')}
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="profile-content">
+          {attendanceData && attendanceData.length > 0 ? (
+            <div className="info-card">
+              <h2 className="section-title">Attendance History</h2>
+              <div className="table-container">
+                <table className="staff-table">
+                  <thead className="table-header">
+                    <tr>
+                      <th>Date</th>
+                      <th>Clock In</th>
+                      <th>Clock Out</th>
+                      <th>Total Hours</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attendanceData.map((record, index) => (
+                      <tr key={record.attendance_log || index} className="table-row">
+                        <td>{formatDate(record.date)}</td>
+                        <td>{formatTime(record.check_in)}</td>
+                        <td>{formatTime(record.check_out)}</td>
+                        <td>{formatHours(record.total_hours)}</td>
+                        <td>{getStatusBadge(record.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="info-card">
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                <User size={48} style={{ color: '#d1d5db', marginBottom: '1rem' }} />
+                <h3 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>No Attendance Records Found</h3>
+                <p style={{ margin: '0 0 1rem 0' }}>You don't have any attendance records yet.</p>
+                <button 
+                  className="retry-button"
+                  onClick={handleRetry}
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-
-      {error && (
-        <div className="error-banner">
-          {renderErrorMessage(error, 'warning')}
-        </div>
-      )}
-
-      {attendanceData && attendanceData.length > 0 ? (
-        <div className="attendance-table-container">
-          <table className="attendance-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Clock In</th>
-                <th>Clock Out</th>
-                <th>Total Hours</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attendanceData.map((record, index) => (
-                <tr key={record.attendance_log || index}>
-                  <td>{formatDate(record.date)}</td>
-                  <td>{formatTime(record.check_in)}</td>
-                  <td>{formatTime(record.check_out)}</td>
-                  <td>{formatHours(record.total_hours)}</td>
-                  <td>{getStatusBadge(record.status)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="no-data-message">
-          <User size={48} />
-          <h3>No Attendance Records Found</h3>
-          <p>You don't have any attendance records yet.</p>
-          <button 
-            className="retry-button"
-            onClick={handleRetry}
-          >
-            Refresh
-          </button>
-        </div>
-      )}
     </div>
   );
 };

@@ -21,7 +21,6 @@ import Department from './Department';
 import Salary from './Salary';
 import LeaveManagement from './LeaveManagement.jsx';
 import Payroll from './Payroll.jsx';
-import LoginForm from '../../components/LoginForm.jsx';
 
 // Layout Component
 const Layout = ({ children }) => (
@@ -67,7 +66,7 @@ const DashboardHome = () => {
       title: 'Employee Management', 
       desc: 'View and manage employee information and records', 
       icon: Users,
-      path: '/hr/staffs',
+      path: '/hr/staff',
       color: 'blue'
     },
     { 
@@ -357,7 +356,7 @@ export default function Homepage() {
       <Routes>
         <Route path="*" element={<DashboardHome />} />
         <Route path="/" element={<DashboardHome />} />
-        <Route path="/staffs" element={<Staffinfo />} />
+        <Route path="/staff" element={<Staffinfo />} />
         <Route path="/staffinfo" element={<Staffinfo />} />
         <Route path="/user-accounts" element={<UserAccount />} />
         <Route path="/attendance" element={<Attendance />} />

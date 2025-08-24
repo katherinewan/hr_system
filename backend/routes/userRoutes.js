@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-console.log('🛣️  Loading user account routes...');
+console.log('🛣️ Loading user account routes...');
 
 const {
   getAllUsers,
@@ -11,7 +11,8 @@ const {
   changePassword,
   updateUserRole,
   toggleUserLock,
-  updateUser
+  updateUser,
+  deleteUser  // Add this import
 } = require('../controllers/userController');
 
 const logRequest = (req, res, next) => {
@@ -56,6 +57,9 @@ router.put('/:user_id/toggle-lock', toggleUserLock);
 
 // Update user data route - supports frontend edit functionality
 router.put('/:user_id', updateUser);
+
+// Delete user route - add this new route
+router.delete('/:user_id', deleteUser);
 
 // Get specific user by ID - place before generic routes
 router.get('/:user_id', searchUsersById);
