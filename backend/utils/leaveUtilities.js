@@ -1,7 +1,9 @@
-// utils/holidayUtils.js
+// utils/leaveUtilities.js - Optimized Leave Management Utilities
 const { query } = require('../config/database');
 
-console.log('🔧 Loading Leave Management Utilities...');
+console.log('🔧 Loading Optimized Leave Management Utilities...');
+
+// ===== CONSTANTS AND MAPPINGS =====
 
 const LEAVE_TYPE_MAPPING = {
   'sick_leave': 'Sick Leave',
@@ -26,59 +28,71 @@ const LEAVE_STATUS_MAPPING = {
   'Cancelled': 'Cancelled'
 };
 
+const PRIORITY_LEVELS = {
+  URGENT: 'urgent',
+  HIGH: 'high', 
+  MEDIUM: 'medium',
+  NORMAL: 'normal'
+};
+
+const LEAVE_TYPE_PRIORITIES = {
+  'emergency_leave': 25,
+  'sick_leave': 15,
+  'maternity_leave': 10,
+  'paternity_leave': 10,
+  'annual_leave': 5,
+  'casual_leave': 0
+};
+
+// ===== TRANSLATION FUNCTIONS =====
+
 /**
- * Translate leave type
- * @param {string} leaveType - Leave type
+ * Translate leave type to display format
+ * @param {string} leaveType - Leave type code
  * @param {string} targetLang - Target language ('en' or 'zh')
  * @returns {string} Translated leave type
  */
 const translateLeaveType = (leaveType, targetLang = 'en') => {
   if (!leaveType) return '';
-  
-  if (targetLang === 'en') {
-    return LEAVE_TYPE_MAPPING[leaveType] || leaveType;
-  } else {
-    return LEAVE_TYPE_MAPPING[leaveType] || leaveType;
-  }
+  return LEAVE_TYPE_MAPPING[leaveType] || leaveType;
 };
 
 /**
- * Translate leave status
+ * Translate leave status to display format
  * @param {string} status - Leave status
  * @param {string} targetLang - Target language ('en' or 'zh')
  * @returns {string} Translated leave status
  */
 const translateLeaveStatus = (status, targetLang = 'en') => {
   if (!status) return '';
-  
-  if (targetLang === 'en') {
-    return LEAVE_STATUS_MAPPING[status] || status;
-  } else {
-    return LEAVE_STATUS_MAPPING[status] || status;
-  }
+  return LEAVE_STATUS_MAPPING[status] || status;
 };
 
+// ===== DATE CALCULATION FUNCTIONS =====
+
 /**
- * Calculate working days (excluding weekends)
+ * Calculate working days (excluding weekends and holidays)
  * @param {Date|string} startDate - Start date
  * @param {Date|string} endDate - End date
+ * @param {Array} holidays - Array of holiday dates (optional)
  * @returns {number} Working days
  */
-const calculateWorkingDays = (startDate, endDate) => {
+const calculateWorkingDays = (startDate, endDate, holidays = []) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  if (start > end) {
-    return 0;
-  }
+  if (start > end) return 0;
   
   let workingDays = 0;
   const currentDate = new Date(start);
+  const holidaySet = new Set(holidays.map(h => new Date(h).toDateString()));
   
   while (currentDate <= end) {
     const dayOfWeek = currentDate.getDay();
-    // 0 = Sunday, 6 = Saturday
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isHoliday = holidaySet.has(currentDate.toDateString());
+    
+    if (!isWeekend && !isHoliday) {
       workingDays++;
     }
     currentDate.setDate(currentDate.getDate() + 1);
@@ -97,33 +111,52 @@ const calculateTotalDays = (startDate, endDate) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  if (start > end) {
-    return 0;
-  }
+  if (start > end) return 0;
   
   const timeDiff = end.getTime() - start.getTime();
-  const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 to include start date
-  
-  return daysDiff;
+  return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // +1 to include start date
 };
 
 /**
- * Validate leave application dates
+ * Calculate working days between two dates using database function (if available)
  * @param {string} startDate - Start date
  * @param {string} endDate - End date
- * @param {boolean} allowPastDates - Whether to allow past dates
+ * @returns {Promise<number>} Number of working days
+ */
+const calculateWorkingDaysDB = async (startDate, endDate) => {
+  try {
+    const result = await query(`
+      SELECT calculate_working_days($1, $2) as working_days
+    `, [startDate, endDate]);
+    
+    return result.rows[0]?.working_days || 0;
+  } catch (error) {
+    console.warn('Database working days calculation failed, using JavaScript fallback:', error.message);
+    return calculateWorkingDays(startDate, endDate);
+  }
+};
+
+// ===== DATE VALIDATION FUNCTIONS =====
+
+/**
+ * Validate leave application dates with comprehensive checks
+ * @param {string} startDate - Start date
+ * @param {string} endDate - End date
+ * @param {Object} options - Validation options
  * @returns {Object} Validation result
  */
-const validateLeaveDates = (startDate, endDate, allowPastDates = false) => {
+const validateLeaveDates = (startDate, endDate, options = {}) => {
+  const { 
+    allowPastDates = false,
+    maxFutureDays = 730, // 2 years
+    maxLeaveDays = 365    // 1 year
+  } = options;
+  
   const errors = [];
+  const warnings = [];
   
-  if (!startDate) {
-    errors.push('Start date is required');
-  }
-  
-  if (!endDate) {
-    errors.push('End date is required');
-  }
+  if (!startDate) errors.push('Start date is required');
+  if (!endDate) errors.push('End date is required');
   
   if (startDate && endDate) {
     const start = new Date(startDate);
@@ -131,52 +164,74 @@ const validateLeaveDates = (startDate, endDate, allowPastDates = false) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    if (isNaN(start.getTime())) {
-      errors.push('Invalid start date format');
-    }
-    
-    if (isNaN(end.getTime())) {
-      errors.push('Invalid end date format');
-    }
+    // Date format validation
+    if (isNaN(start.getTime())) errors.push('Invalid start date format');
+    if (isNaN(end.getTime())) errors.push('Invalid end date format');
     
     if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      // Date logic validation
       if (start > end) {
         errors.push('Start date cannot be later than end date');
       }
       
+      // Past date validation
       if (!allowPastDates && start < today) {
         errors.push('Start date cannot be in the past');
       }
       
-      // Check if date is too far in the future (more than 2 years)
-      const twoYearsLater = new Date();
-      twoYearsLater.setFullYear(twoYearsLater.getFullYear() + 2);
+      // Future date validation
+      const maxFutureDate = new Date();
+      maxFutureDate.setDate(maxFutureDate.getDate() + maxFutureDays);
       
-      if (end > twoYearsLater) {
-        errors.push('End date cannot be more than two years in the future');
+      if (end > maxFutureDate) {
+        errors.push(`End date cannot be more than ${Math.floor(maxFutureDays / 365)} years in the future`);
+      }
+      
+      // Duration validation
+      const totalDays = calculateTotalDays(startDate, endDate);
+      if (totalDays > maxLeaveDays) {
+        errors.push(`Leave duration cannot exceed ${maxLeaveDays} days`);
+      }
+      
+      // Warning for very short applications
+      const daysUntilStart = Math.floor((start - today) / (1000 * 60 * 60 * 24));
+      if (daysUntilStart < 3 && daysUntilStart >= 0) {
+        warnings.push('Leave application with less than 3 days notice may require special approval');
+      }
+      
+      // Warning for weekend-only leave
+      const workingDays = calculateWorkingDays(startDate, endDate);
+      if (workingDays === 0 && totalDays > 0) {
+        warnings.push('This leave request covers only weekends');
       }
     }
   }
   
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
+    warnings,
+    hasWarnings: warnings.length > 0
   };
 };
 
+// ===== DATA FORMATTING FUNCTIONS =====
+
 /**
- * Format leave request data
- * @param {Object} leaveRequest - Leave request data
+ * Format leave request data for API response
+ * @param {Object} leaveRequest - Raw leave request data
  * @param {string} locale - Language setting ('en' or 'zh')
  * @returns {Object} Formatted data
  */
 const formatLeaveRequest = (leaveRequest, locale = 'en') => {
   if (!leaveRequest) return null;
   
-  return {
+  const formatted = {
     ...leaveRequest,
     leave_type_display: translateLeaveType(leaveRequest.leave_type, locale),
     status_display: translateLeaveStatus(leaveRequest.status, locale),
+    
+    // Formatted dates
     applied_on_formatted: leaveRequest.applied_on ? 
       new Date(leaveRequest.applied_on).toLocaleDateString('en-US') : null,
     approved_on_formatted: leaveRequest.approved_on ? 
@@ -185,69 +240,77 @@ const formatLeaveRequest = (leaveRequest, locale = 'en') => {
       new Date(leaveRequest.start_date).toLocaleDateString('en-US') : null,
     end_date_formatted: leaveRequest.end_date ? 
       new Date(leaveRequest.end_date).toLocaleDateString('en-US') : null,
+    
+    // Calculated fields
     working_days: leaveRequest.start_date && leaveRequest.end_date ? 
-      calculateWorkingDays(leaveRequest.start_date, leaveRequest.end_date) : 0
+      calculateWorkingDays(leaveRequest.start_date, leaveRequest.end_date) : 0,
+    
+    // Convert numeric days to integers
+    days_until_start: parseInt(leaveRequest.days_until_start) || 0,
+    days_since_applied: parseInt(leaveRequest.days_since_applied) || 0,
+    
+    // Medical certificate as boolean
+    has_medical_certificate: Boolean(leaveRequest.medical_certificate),
+    
+    // Emergency contact availability
+    has_emergency_contact: Boolean(leaveRequest.emergency_contact)
   };
+  
+  return formatted;
 };
 
 /**
- * Format leave quota data
- * @param {Object} leaveQuota - Leave quota data
+ * Format leave quota data for API response
+ * @param {Object} leaveQuota - Raw leave quota data
  * @param {string} locale - Language setting
  * @returns {Object} Formatted data
  */
 const formatLeaveQuota = (leaveQuota, locale = 'en') => {
   if (!leaveQuota) return null;
   
-  const formatQuotaItem = (enabled, quota, used, type) => ({
-    enabled,
-    quota: quota || 0,
-    used: used || 0,
-    remaining: (quota || 0) - (used || 0),
+  const formatQuotaItem = (quota, used, type) => ({
+    quota: parseInt(quota) || 0,
+    used: parseInt(used) || 0,
+    remaining: (parseInt(quota) || 0) - (parseInt(used) || 0),
     utilization_rate: quota > 0 ? Math.round((used / quota) * 100) : 0,
     type_display: translateLeaveType(type, locale)
   });
   
+  const totalQuota = (leaveQuota.sl_quota || 0) + (leaveQuota.al_quota || 0) + 
+                    (leaveQuota.cl_quota || 0) + (leaveQuota.ml_quota || 0) + 
+                    (leaveQuota.pl_quota || 0);
+  
+  const totalUsed = (leaveQuota.sl_used || 0) + (leaveQuota.al_used || 0) + 
+                   (leaveQuota.cl_used || 0) + (leaveQuota.ml_used || 0) + 
+                   (leaveQuota.pl_used || 0);
+  
   return {
     ...leaveQuota,
-    sick_leave: formatQuotaItem(
-      leaveQuota.sick_leave_enabled, 
-      leaveQuota.sl_quota, 
-      leaveQuota.sl_used, 
-      'sick_leave'
-    ),
-    annual_leave: formatQuotaItem(
-      leaveQuota.annual_leave_enabled, 
-      leaveQuota.al_quota, 
-      leaveQuota.al_used, 
-      'annual_leave'
-    ),
-    casual_leave: formatQuotaItem(
-      leaveQuota.casual_leave_enabled, 
-      leaveQuota.cl_quota, 
-      leaveQuota.cl_used, 
-      'casual_leave'
-    ),
-    maternity_leave: formatQuotaItem(
-      leaveQuota.maternity_leave_enabled, 
-      leaveQuota.ml_quota, 
-      leaveQuota.ml_used, 
-      'maternity_leave'
-    ),
-    paternity_leave: formatQuotaItem(
-      leaveQuota.paternity_leave_enabled, 
-      leaveQuota.pl_quota, 
-      leaveQuota.pl_used, 
-      'paternity_leave'
-    ),
-    total_quota: (leaveQuota.sl_quota || 0) + (leaveQuota.al_quota || 0) + 
-                 (leaveQuota.cl_quota || 0) + (leaveQuota.ml_quota || 0) + 
-                 (leaveQuota.pl_quota || 0),
-    total_used: (leaveQuota.sl_used || 0) + (leaveQuota.al_used || 0) + 
-                (leaveQuota.cl_used || 0) + (leaveQuota.ml_used || 0) + 
-                (leaveQuota.pl_used || 0)
+    
+    // Individual leave types
+    sick_leave: formatQuotaItem(leaveQuota.sl_quota, leaveQuota.sl_used, 'sick_leave'),
+    annual_leave: formatQuotaItem(leaveQuota.al_quota, leaveQuota.al_used, 'annual_leave'),
+    casual_leave: formatQuotaItem(leaveQuota.cl_quota, leaveQuota.cl_used, 'casual_leave'),
+    maternity_leave: formatQuotaItem(leaveQuota.ml_quota, leaveQuota.ml_used, 'maternity_leave'),
+    paternity_leave: formatQuotaItem(leaveQuota.pl_quota, leaveQuota.pl_used, 'paternity_leave'),
+    
+    // Totals
+    total_quota: totalQuota,
+    total_used: totalUsed,
+    total_remaining: totalQuota - totalUsed,
+    overall_utilization_rate: totalQuota > 0 ? Math.round((totalUsed / totalQuota) * 100) : 0,
+    
+    // Status indicators
+    is_overused: totalUsed > totalQuota,
+    is_nearly_exhausted: totalQuota > 0 && ((totalQuota - totalUsed) / totalQuota) < 0.1,
+    
+    // Formatted dates
+    last_quota_update_formatted: leaveQuota.last_quota_update ?
+      new Date(leaveQuota.last_quota_update).toLocaleDateString('en-US') : null
   };
 };
+
+// ===== BUSINESS LOGIC FUNCTIONS =====
 
 /**
  * Check for leave application conflicts
@@ -265,15 +328,16 @@ const checkLeaveConflict = async (staffId, startDate, endDate, excludeRequestId 
         leave_type,
         start_date,
         end_date,
-        status
+        status,
+        total_days
       FROM leave_requests 
       WHERE staff_id = $1 
-      AND status IN ('Pending', 'Approved')
-      AND (
-        (start_date <= $2 AND end_date >= $2) OR
-        (start_date <= $3 AND end_date >= $3) OR
-        (start_date >= $2 AND end_date <= $3)
-      )
+        AND status IN ('Pending', 'Approved')
+        AND (
+          (start_date <= $2 AND end_date >= $2) OR
+          (start_date <= $3 AND end_date >= $3) OR
+          (start_date >= $2 AND end_date <= $3)
+        )
     `;
     
     const params = [staffId, startDate, endDate];
@@ -283,16 +347,26 @@ const checkLeaveConflict = async (staffId, startDate, endDate, excludeRequestId 
       params.push(excludeRequestId);
     }
     
+    conflictQuery += ` ORDER BY start_date ASC`;
+    
     const result = await query(conflictQuery, params);
     
     return {
       hasConflict: result.rows.length > 0,
-      conflictingRequests: result.rows
+      conflictCount: result.rows.length,
+      conflictingRequests: result.rows.map(row => ({
+        ...row,
+        overlap_type: determineOverlapType(
+          { start: startDate, end: endDate },
+          { start: row.start_date, end: row.end_date }
+        )
+      }))
     };
   } catch (error) {
     console.error('Error checking leave conflict:', error);
     return {
       hasConflict: false,
+      conflictCount: 0,
       conflictingRequests: [],
       error: error.message
     };
@@ -300,113 +374,110 @@ const checkLeaveConflict = async (staffId, startDate, endDate, excludeRequestId 
 };
 
 /**
- * Get staff leave history statistics
- * @param {number} staffId - Staff ID
- * @param {number} leaveYear - Leave year
- * @returns {Promise<Object>} Statistics result
+ * Determine the type of date overlap between two date ranges
+ * @param {Object} range1 - First date range
+ * @param {Object} range2 - Second date range
+ * @returns {string} Overlap type
  */
-const getStaffLeaveHistory = async (staffId, leaveYear = new Date().getFullYear()) => {
-  try {
-    const historyResult = await query(`
-      SELECT 
-        leave_type,
-        COUNT(*) as total_requests,
-        COUNT(CASE WHEN status = 'Approved' THEN 1 END) as approved_count,
-        COUNT(CASE WHEN status = 'Rejected' THEN 1 END) as rejected_count,
-        COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_count,
-        SUM(CASE WHEN status = 'Approved' THEN total_days ELSE 0 END) as total_approved_days,
-        AVG(CASE WHEN status = 'Approved' THEN total_days END) as avg_approved_days,
-        MIN(CASE WHEN status = 'Approved' THEN applied_on END) as first_approved,
-        MAX(CASE WHEN status = 'Approved' THEN applied_on END) as latest_approved
-      FROM leave_requests 
-      WHERE staff_id = $1 
-      AND EXTRACT(YEAR FROM start_date) = $2
-      GROUP BY leave_type
-      ORDER BY total_requests DESC
-    `, [staffId, leaveYear]);
-    
-    return {
-      success: true,
-      data: historyResult.rows,
-      staff_id: staffId,
-      leave_year: leaveYear
-    };
-  } catch (error) {
-    console.error('Error getting staff leave history:', error);
-    return {
-      success: false,
-      error: error.message,
-      data: []
-    };
+const determineOverlapType = (range1, range2) => {
+  const start1 = new Date(range1.start);
+  const end1 = new Date(range1.end);
+  const start2 = new Date(range2.start);
+  const end2 = new Date(range2.end);
+  
+  if (start1.getTime() === start2.getTime() && end1.getTime() === end2.getTime()) {
+    return 'exact_match';
+  } else if (start1 >= start2 && end1 <= end2) {
+    return 'contained_within';
+  } else if (start2 >= start1 && end2 <= end1) {
+    return 'contains';
+  } else if (start1 <= end2 && end1 >= start2) {
+    return 'partial_overlap';
   }
+  
+  return 'no_overlap';
 };
 
 /**
- * Calculate leave application priority
+ * Calculate leave application priority with detailed scoring
  * @param {Object} leaveRequest - Leave request data
  * @returns {Object} Priority information
  */
 const calculateLeavePriority = (leaveRequest) => {
-  if (!leaveRequest) return { priority: 'normal', score: 0 };
+  if (!leaveRequest) return { priority: PRIORITY_LEVELS.NORMAL, score: 0 };
   
   let score = 0;
-  let priority = 'normal';
-  let reasons = [];
+  const reasons = [];
   
-  // Check application date (earlier applications get lower score, higher priority)
+  // Base priority by leave type
+  const typeScore = LEAVE_TYPE_PRIORITIES[leaveRequest.leave_type] || 0;
+  score += typeScore;
+  if (typeScore > 0) {
+    reasons.push(`${translateLeaveType(leaveRequest.leave_type)} type priority`);
+  }
+  
+  // Urgency based on start date
+  const daysUntilStart = Math.floor(
+    (new Date(leaveRequest.start_date) - new Date()) / (1000 * 60 * 60 * 24)
+  );
+  
+  if (daysUntilStart <= 0) {
+    score += 30;
+    reasons.push('Leave has already started or starts today');
+  } else if (daysUntilStart <= 1) {
+    score += 25;
+    reasons.push('Leave starting within 1 day');
+  } else if (daysUntilStart <= 3) {
+    score += 15;
+    reasons.push('Leave starting within 3 days');
+  } else if (daysUntilStart <= 7) {
+    score += 5;
+    reasons.push('Leave starting within a week');
+  }
+  
+  // Application age
   const daysFromApplication = Math.floor(
     (new Date() - new Date(leaveRequest.applied_on)) / (1000 * 60 * 60 * 24)
   );
   
-  if (daysFromApplication > 7) {
+  if (daysFromApplication > 14) {
     score += 20;
+    reasons.push('Application pending for more than 2 weeks');
+  } else if (daysFromApplication > 7) {
+    score += 15;
     reasons.push('Application pending for more than a week');
   } else if (daysFromApplication > 3) {
     score += 10;
     reasons.push('Application pending for more than 3 days');
   }
   
-  // Check leave type
-  if (leaveRequest.leave_type === 'sick_leave') {
-    score += 15;
-    reasons.push('Sick leave application');
-  } else if (leaveRequest.leave_type === 'emergency_leave') {
-    score += 25;
-    reasons.push('Emergency leave application');
-  } else if (leaveRequest.medical_certificate) {
+  // Medical certificate bonus
+  if (leaveRequest.medical_certificate) {
     score += 10;
     reasons.push('Medical certificate provided');
   }
   
-  // Check leave duration
-  if (leaveRequest.total_days > 10) {
-    score += 15;
-    reasons.push('Long-term leave (more than 10 days)');
-  } else if (leaveRequest.total_days > 5) {
-    score += 8;
+  // Leave duration considerations
+  const totalDays = parseInt(leaveRequest.total_days) || 0;
+  if (totalDays > 30) {
+    score += 20;
+    reasons.push('Long-term leave (more than 30 days)');
+  } else if (totalDays > 10) {
+    score += 10;
+    reasons.push('Extended leave (10-30 days)');
+  } else if (totalDays > 5) {
+    score += 5;
     reasons.push('Medium-term leave (5-10 days)');
   }
   
-  // Check urgency of start date
-  const daysUntilStart = Math.floor(
-    (new Date(leaveRequest.start_date) - new Date()) / (1000 * 60 * 60 * 24)
-  );
-  
-  if (daysUntilStart <= 1) {
-    score += 20;
-    reasons.push('Leave starting within 1 day');
-  } else if (daysUntilStart <= 3) {
-    score += 10;
-    reasons.push('Leave starting within 3 days');
-  }
-  
   // Determine priority level
-  if (score >= 40) {
-    priority = 'urgent';
-  } else if (score >= 20) {
-    priority = 'high';
-  } else if (score >= 10) {
-    priority = 'medium';
+  let priority = PRIORITY_LEVELS.NORMAL;
+  if (score >= 50) {
+    priority = PRIORITY_LEVELS.URGENT;
+  } else if (score >= 30) {
+    priority = PRIORITY_LEVELS.HIGH;
+  } else if (score >= 15) {
+    priority = PRIORITY_LEVELS.MEDIUM;
   }
   
   return {
@@ -414,12 +485,86 @@ const calculateLeavePriority = (leaveRequest) => {
     score,
     reasons,
     days_from_application: daysFromApplication,
-    days_until_start: daysUntilStart
+    days_until_start: daysUntilStart,
+    total_days: totalDays,
+    scoring_breakdown: {
+      type_score: typeScore,
+      urgency_bonus: Math.max(0, 30 - Math.max(0, daysUntilStart * 5)),
+      age_bonus: Math.min(20, Math.max(0, (daysFromApplication - 3) * 2)),
+      medical_bonus: leaveRequest.medical_certificate ? 10 : 0,
+      duration_bonus: totalDays > 30 ? 20 : totalDays > 10 ? 10 : totalDays > 5 ? 5 : 0
+    }
   };
 };
 
 /**
- * Generate leave summary report
+ * Comprehensive validation of leave request data
+ * @param {Object} requestData - Leave request data
+ * @returns {Object} Validation result
+ */
+const validateLeaveRequestData = (requestData) => {
+  const errors = [];
+  const warnings = [];
+  
+  // Required field validation
+  const requiredFields = {
+    staff_id: 'Staff ID',
+    leave_type: 'Leave type',
+    start_date: 'Start date',
+    end_date: 'End date',
+    reason: 'Leave reason'
+  };
+  
+  Object.entries(requiredFields).forEach(([field, displayName]) => {
+    if (!requestData[field] || (typeof requestData[field] === 'string' && !requestData[field].trim())) {
+      errors.push(`${displayName} is required`);
+    }
+  });
+  
+  // Leave type validation
+  const validLeaveTypes = Object.keys(LEAVE_TYPE_MAPPING).filter(key => !key.includes(' '));
+  if (requestData.leave_type && !validLeaveTypes.includes(requestData.leave_type)) {
+    errors.push(`Invalid leave type. Valid types: ${validLeaveTypes.join(', ')}`);
+  }
+  
+  // Date validation
+  if (requestData.start_date && requestData.end_date) {
+    const dateValidation = validateLeaveDates(requestData.start_date, requestData.end_date);
+    if (!dateValidation.isValid) {
+      errors.push(...dateValidation.errors);
+    }
+    if (dateValidation.hasWarnings) {
+      warnings.push(...dateValidation.warnings);
+    }
+  }
+  
+  // Staff ID format validation
+  if (requestData.staff_id && typeof requestData.staff_id !== 'number') {
+    if (!Number.isInteger(Number(requestData.staff_id))) {
+      errors.push('Staff ID must be a valid integer');
+    }
+  }
+  
+  // Reason length validation
+  if (requestData.reason && requestData.reason.trim().length < 10) {
+    warnings.push('Leave reason is very short. Consider providing more details.');
+  }
+  
+  // Emergency contact validation
+  if (requestData.emergency_contact && requestData.emergency_contact.trim().length < 5) {
+    warnings.push('Emergency contact information seems incomplete');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    hasWarnings: warnings.length > 0
+  };
+};
+
+/**
+ * Generate comprehensive leave summary statistics
  * @param {Array} leaveRequests - Leave request list
  * @returns {Object} Summary report
  */
@@ -430,7 +575,8 @@ const generateLeaveSummary = (leaveRequests) => {
       by_status: {},
       by_type: {},
       total_days: 0,
-      avg_days: 0
+      avg_days: 0,
+      date_range: null
     };
   }
   
@@ -438,79 +584,85 @@ const generateLeaveSummary = (leaveRequests) => {
     total: leaveRequests.length,
     by_status: {},
     by_type: {},
+    by_priority: { urgent: 0, high: 0, medium: 0, normal: 0 },
     total_days: 0,
     approved_days: 0,
     avg_days: 0,
-    avg_approved_days: 0
+    avg_approved_days: 0,
+    date_range: {
+      earliest_application: null,
+      latest_application: null,
+      earliest_start: null,
+      latest_end: null
+    },
+    medical_certificates: 0,
+    emergency_contacts: 0
   };
   
-  // Calculate various statistics
+  let earliestApp = null, latestApp = null, earliestStart = null, latestEnd = null;
+  
+  // Process each request
   leaveRequests.forEach(request => {
-    // By status statistics
+    // Status statistics
     summary.by_status[request.status] = (summary.by_status[request.status] || 0) + 1;
     
-    // By type statistics
+    // Type statistics
     summary.by_type[request.leave_type] = (summary.by_type[request.leave_type] || 0) + 1;
     
-    // Total days
-    summary.total_days += request.total_days || 0;
-    
-    // Approved days
-    if (request.status === 'Approved') {
-      summary.approved_days += request.total_days || 0;
+    // Priority statistics (if priority is calculated)
+    if (request.priority_level) {
+      summary.by_priority[request.priority_level] = (summary.by_priority[request.priority_level] || 0) + 1;
     }
+    
+    // Days calculation
+    const totalDays = parseInt(request.total_days) || 0;
+    summary.total_days += totalDays;
+    
+    if (request.status === 'Approved') {
+      summary.approved_days += totalDays;
+    }
+    
+    // Date range tracking
+    const appDate = new Date(request.applied_on);
+    const startDate = new Date(request.start_date);
+    const endDate = new Date(request.end_date);
+    
+    if (!earliestApp || appDate < earliestApp) earliestApp = appDate;
+    if (!latestApp || appDate > latestApp) latestApp = appDate;
+    if (!earliestStart || startDate < earliestStart) earliestStart = startDate;
+    if (!latestEnd || endDate > latestEnd) latestEnd = endDate;
+    
+    // Additional statistics
+    if (request.medical_certificate) summary.medical_certificates++;
+    if (request.emergency_contact) summary.emergency_contacts++;
   });
   
   // Calculate averages
-  summary.avg_days = summary.total > 0 ? Math.round((summary.total_days / summary.total) * 100) / 100 : 0;
+  summary.avg_days = summary.total > 0 ? 
+    Math.round((summary.total_days / summary.total) * 100) / 100 : 0;
   
   const approvedCount = summary.by_status['Approved'] || 0;
   summary.avg_approved_days = approvedCount > 0 ? 
     Math.round((summary.approved_days / approvedCount) * 100) / 100 : 0;
   
+  // Set date ranges
+  summary.date_range = {
+    earliest_application: earliestApp?.toISOString().split('T')[0] || null,
+    latest_application: latestApp?.toISOString().split('T')[0] || null,
+    earliest_start: earliestStart?.toISOString().split('T')[0] || null,
+    latest_end: latestEnd?.toISOString().split('T')[0] || null
+  };
+  
+  // Calculate rates
+  summary.approval_rate = summary.total > 0 ? 
+    Math.round(((summary.by_status['Approved'] || 0) / summary.total) * 100) : 0;
+  summary.medical_certificate_rate = summary.total > 0 ?
+    Math.round((summary.medical_certificates / summary.total) * 100) : 0;
+  
   return summary;
 };
 
-/**
- * Validate leave application permission
- * @param {number} staffId - Staff ID
- * @param {string} leaveType - Leave type
- * @param {number} requestedDays - Requested days
- * @param {number} leaveYear - Leave year
- * @returns {Promise<Object>} Permission check result
- */
-const validateLeavePermission = async (staffId, leaveType, requestedDays, leaveYear = new Date().getFullYear()) => {
-  try {
-    // Use database function to check permission
-    const result = await query(`
-      SELECT * FROM check_leave_eligibility($1, $2, $3, $4)
-    `, [staffId, leaveType, requestedDays, leaveYear]);
-    
-    const eligibility = result.rows[0];
-    
-    return {
-      success: true,
-      eligible: eligibility.eligible,
-      available_quota: eligibility.available_quota,
-      message: eligibility.message,
-      details: {
-        staff_id: staffId,
-        leave_type: leaveType,
-        requested_days: requestedDays,
-        leave_year: leaveYear
-      }
-    };
-  } catch (error) {
-    console.error('Error validating leave permission:', error);
-    return {
-      success: false,
-      eligible: false,
-      available_quota: 0,
-      message: 'Permission check failed',
-      error: error.message
-    };
-  }
-};
+// ===== UTILITY FUNCTIONS =====
 
 /**
  * Format date for database (YYYY-MM-DD format)
@@ -527,7 +679,7 @@ const formatDateForDB = (date) => {
 };
 
 /**
- * Check if date is a working day
+ * Check if date is a working day (Monday-Friday)
  * @param {Date|string} date - Date
  * @returns {boolean} Whether it's a working day
  */
@@ -538,7 +690,7 @@ const isWorkingDay = (date) => {
 };
 
 /**
- * Get next working day
+ * Get next working day after given date
  * @param {Date|string} date - Starting date
  * @returns {Date} Next working day
  */
@@ -551,234 +703,18 @@ const getNextWorkingDay = (date) => {
   return d;
 };
 
-/**
- * Calculate working days between two dates (using database function)
- * @param {string} startDate - Start date
- * @param {string} endDate - End date
- * @returns {Promise<number>} Number of working days
- */
-const calculateWorkingDaysDB = async (startDate, endDate) => {
-  try {
-    const result = await query(`
-      SELECT calculate_working_days($1, $2) as working_days
-    `, [startDate, endDate]);
-    
-    return result.rows[0].working_days || 0;
-  } catch (error) {
-    console.error('Error calculating working days:', error);
-    // Fallback to JavaScript calculation
-    return calculateWorkingDays(startDate, endDate);
-  }
-};
-
-/**
- * Generate leave application reminder
- * @param {Object} leaveRequest - Leave request
- * @returns {Object} Reminder information
- */
-const generateLeaveReminder = (leaveRequest) => {
-  if (!leaveRequest) return null;
-  
-  const now = new Date();
-  const startDate = new Date(leaveRequest.start_date);
-  const appliedDate = new Date(leaveRequest.applied_on);
-  
-  const daysUntilStart = Math.ceil((startDate - now) / (1000 * 60 * 60 * 24));
-  const daysSinceApplied = Math.floor((now - appliedDate) / (1000 * 60 * 60 * 24));
-  
-  let reminderType = 'info';
-  let message = '';
-  let urgent = false;
-  
-  if (leaveRequest.status === 'Pending') {
-    if (daysUntilStart <= 1) {
-      reminderType = 'urgent';
-      message = 'Leave starts soon, please process this request urgently';
-      urgent = true;
-    } else if (daysUntilStart <= 3) {
-      reminderType = 'warning';
-      message = 'Leave starts within 3 days, please process soon';
-    } else if (daysSinceApplied >= 7) {
-      reminderType = 'warning';
-      message = 'Application has been pending for more than a week';
-    } else if (daysSinceApplied >= 3) {
-      reminderType = 'info';
-      message = 'Application has been pending for more than 3 days';
-    }
-  }
-  
-  return {
-    type: reminderType,
-    message,
-    urgent,
-    days_until_start: daysUntilStart,
-    days_since_applied: daysSinceApplied,
-    priority: calculateLeavePriority(leaveRequest)
-  };
-};
-
-/**
- * Validate leave request data comprehensively
- * @param {Object} requestData - Leave request data
- * @returns {Object} Validation result
- */
-const validateLeaveRequestData = (requestData) => {
-  const errors = [];
-  
-  // Required field validation
-  if (!requestData.staff_id) {
-    errors.push('Staff ID is required');
-  }
-  
-  if (!requestData.leave_type) {
-    errors.push('Leave type is required');
-  }
-  
-  if (!requestData.start_date) {
-    errors.push('Start date is required');
-  }
-  
-  if (!requestData.end_date) {
-    errors.push('End date is required');
-  }
-  
-  if (!requestData.reason || !requestData.reason.trim()) {
-    errors.push('Leave reason is required');
-  }
-  
-  // Date validation
-  if (requestData.start_date && requestData.end_date) {
-    const dateValidation = validateLeaveDates(requestData.start_date, requestData.end_date);
-    if (!dateValidation.isValid) {
-      errors.push(...dateValidation.errors);
-    }
-  }
-  
-  // Leave type validation
-  const validLeaveTypes = ['sick_leave', 'annual_leave', 'casual_leave', 'maternity_leave', 'paternity_leave'];
-  if (requestData.leave_type && !validLeaveTypes.includes(requestData.leave_type)) {
-    errors.push(`Invalid leave type. Valid types: ${validLeaveTypes.join(', ')}`);
-  }
-  
-  // Days validation
-  if (requestData.start_date && requestData.end_date) {
-    const totalDays = calculateTotalDays(requestData.start_date, requestData.end_date);
-    if (totalDays > 365) {
-      errors.push('Leave duration cannot exceed 365 days');
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-};
-
-/**
- * Calculate leave application approval rate
- * @param {Array} requests - Leave requests
- * @returns {Object} Approval rate statistics
- */
-const calculateApprovalRate = (requests) => {
-  if (!Array.isArray(requests) || requests.length === 0) {
-    return {
-      total_requests: 0,
-      approved_requests: 0,
-      rejected_requests: 0,
-      approval_rate: 0,
-      rejection_rate: 0
-    };
-  }
-  
-  const processedRequests = requests.filter(req => 
-    req.status === 'Approved' || req.status === 'Rejected'
-  );
-  
-  const approvedCount = requests.filter(req => req.status === 'Approved').length;
-  const rejectedCount = requests.filter(req => req.status === 'Rejected').length;
-  
-  const approvalRate = processedRequests.length > 0 ? 
-    Math.round((approvedCount / processedRequests.length) * 100) : 0;
-  const rejectionRate = processedRequests.length > 0 ? 
-    Math.round((rejectedCount / processedRequests.length) * 100) : 0;
-  
-  return {
-    total_requests: requests.length,
-    processed_requests: processedRequests.length,
-    approved_requests: approvedCount,
-    rejected_requests: rejectedCount,
-    pending_requests: requests.filter(req => req.status === 'Pending').length,
-    approval_rate: approvalRate,
-    rejection_rate: rejectionRate
-  };
-};
-
-/**
- * Generate leave analytics for a specific period
- * @param {Array} requests - Leave requests
- * @param {string} period - Period type ('month', 'quarter', 'year')
- * @returns {Object} Analytics data
- */
-const generateLeaveAnalytics = (requests, period = 'month') => {
-  if (!Array.isArray(requests) || requests.length === 0) {
-    return {
-      period,
-      total_requests: 0,
-      analytics: []
-    };
-  }
-  
-  const groupedData = {};
-  
-  requests.forEach(request => {
-    let key;
-    const date = new Date(request.applied_on);
-    
-    switch (period) {
-      case 'year':
-        key = date.getFullYear().toString();
-        break;
-      case 'quarter':
-        key = `${date.getFullYear()}-Q${Math.ceil((date.getMonth() + 1) / 3)}`;
-        break;
-      default: // month
-        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    }
-    
-    if (!groupedData[key]) {
-      groupedData[key] = [];
-    }
-    groupedData[key].push(request);
-  });
-  
-  const analytics = Object.keys(groupedData).sort().map(key => ({
-    period: key,
-    total_requests: groupedData[key].length,
-    approved: groupedData[key].filter(req => req.status === 'Approved').length,
-    rejected: groupedData[key].filter(req => req.status === 'Rejected').length,
-    pending: groupedData[key].filter(req => req.status === 'Pending').length,
-    total_days: groupedData[key].reduce((sum, req) => sum + (req.total_days || 0), 0),
-    avg_days: Math.round(
-      groupedData[key].reduce((sum, req) => sum + (req.total_days || 0), 0) / 
-      groupedData[key].length * 100
-    ) / 100
-  }));
-  
-  return {
-    period,
-    total_requests: requests.length,
-    analytics
-  };
-};
-
+// ===== EXPORTS =====
 module.exports = {
-  // Mappings and translations
+  // Constants
   LEAVE_TYPE_MAPPING,
   LEAVE_STATUS_MAPPING,
+  PRIORITY_LEVELS,
+  
+  // Translation functions
   translateLeaveType,
   translateLeaveStatus,
   
-  // Date calculations
+  // Date calculation functions
   calculateWorkingDays,
   calculateTotalDays,
   calculateWorkingDaysDB,
@@ -787,21 +723,18 @@ module.exports = {
   isWorkingDay,
   getNextWorkingDay,
   
-  // Data formatting
+  // Data formatting functions
   formatLeaveRequest,
   formatLeaveQuota,
   
-  // Business logic checks
+  // Business logic functions
   checkLeaveConflict,
-  validateLeavePermission,
-  validateLeaveRequestData,
-  
-  // Statistics and analysis
-  getStaffLeaveHistory,
   calculateLeavePriority,
+  validateLeaveRequestData,
   generateLeaveSummary,
-  generateLeaveReminder,
-  calculateApprovalRate,
-  generateLeaveAnalytics
-};
   
+  // Utility functions
+  determineOverlapType
+};
+
+console.log('✅ Optimized Leave Management Utilities loaded successfully!');

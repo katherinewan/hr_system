@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Eye, CheckCircle, XCircle, User, Mail, Phone, Building, Trash2, 
-  AlertCircle, Loader, FileText, RefreshCw
+  AlertCircle, Loader, FileText, History
 } from 'lucide-react';
 
 const HRLeaveRequests = () => {
@@ -414,7 +414,7 @@ const HRLeaveRequests = () => {
             onClick={loadPendingRequests}
             disabled={loading}
           >
-            <RefreshCw size={20} className="btn-icon" />
+            <History size={20} className="btn-icon" />
             Refresh
           </button>
 
