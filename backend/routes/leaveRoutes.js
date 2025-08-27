@@ -1,434 +1,144 @@
-// routes/leaveRoutes.js - Fixed Leave Management Routes
+// routes/leaveRoutes.js - 簡化的請假管理路由
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 
-// Import controller functions
+// 導入控制器
 const { 
-  getAllStaffLeaveQuotas,
-  getStaffLeaveQuota,
-  updateStaffLeaveQuota,
   getAllLeaveRequests,
-  getPendingLeaveRequests,
+  getMyLeaveRequests,
   submitLeaveRequest,
-  cancelLeaveRequest
+  approveLeaveRequest,
+  rejectLeaveRequest,
+  getAllLeaveQuotas,
+  getMyLeaveQuota
 } = require('../controllers/leaveController');
 
-console.log('Loading Fixed Leave Management Routes...');
+console.log('載入簡化請假管理路由...');
 
-// ===== MIDDLEWARE =====
-
-// Rate limiting for leave requests
-const leaveRequestLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Maximum 10 requests per 15 minutes
+// ===== 速率限制 =====
+const requestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15分鐘
+  max: 20,
   message: {
     success: false,
-    message: 'Too many leave requests. Please try again later.',
-    retry_after: '15 minutes'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
+    message: '請求過於頻繁，請稍後再試'
+  }
 });
 
-// Rate limiting for sensitive operations (updates/cancellations)
-const sensitiveOperationLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 20, // Maximum 20 operations per 5 minutes
-  message: {
-    success: false,
-    message: 'Too many operations. Please slow down.',
-    retry_after: '5 minutes'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Validation middleware for staff_id parameter (now expects integers)
+// ===== 驗證中間件 =====
 const validateStaffId = (req, res, next) => {
   const { staff_id } = req.params;
-  
-  if (!staff_id) {
-    return res.status(400).json({
-      success: false,
-      message: 'Staff ID is required'
-    });
-  }
-  
-  // Validate staff_id as integer
   const staffIdInt = parseInt(staff_id);
+  
   if (isNaN(staffIdInt) || staffIdInt <= 0) {
     return res.status(400).json({
       success: false,
-      message: 'Invalid staff ID format. Must be a positive integer.'
+      message: '無效的員工ID'
     });
   }
   
-  // Add parsed integer to request
   req.staffId = staffIdInt;
-  
   next();
 };
 
-// Validation middleware for request_id parameter
 const validateRequestId = (req, res, next) => {
   const { request_id } = req.params;
-  
-  if (!request_id) {
-    return res.status(400).json({
-      success: false,
-      message: 'Request ID is required'
-    });
-  }
-  
-  // Validate request_id as integer
   const requestIdInt = parseInt(request_id);
+  
   if (isNaN(requestIdInt) || requestIdInt <= 0) {
     return res.status(400).json({
       success: false,
-      message: 'Invalid request ID format. Must be a positive integer.'
+      message: '無效的申請ID'
     });
   }
   
-  // Add parsed integer to request
   req.requestId = requestIdInt;
-  
   next();
 };
 
-// Validation middleware for pagination parameters
-const validatePagination = (req, res, next) => {
-  const { limit, offset } = req.query;
-  
-  if (limit && (isNaN(limit) || parseInt(limit) <= 0 || parseInt(limit) > 1000)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Limit must be a positive number between 1 and 1000'
-    });
-  }
-  
-  if (offset && (isNaN(offset) || parseInt(offset) < 0)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Offset must be a non-negative number'
-    });
-  }
-  
-  next();
-};
+// ===== 路由定義 =====
 
-// Validation middleware for date parameters
-const validateDateParams = (req, res, next) => {
-  const { start_date, end_date, leave_year, year } = req.query;
-  
-  // Validate date format
-  if (start_date && !/^\d{4}-\d{2}-\d{2}$/.test(start_date)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid start_date format. Use YYYY-MM-DD format.'
-    });
-  }
-  
-  if (end_date && !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid end_date format. Use YYYY-MM-DD format.'
-    });
-  }
-  
-  // Validate year parameter
-  const yearToCheck = leave_year || year;
-  if (yearToCheck) {
-    const yearNum = parseInt(yearToCheck);
-    const currentYear = new Date().getFullYear();
-    
-    if (isNaN(yearNum) || yearNum < 2020 || yearNum > currentYear + 5) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid year parameter. Valid range: 2020 - ${currentYear + 5}`
-      });
-    }
-  }
-  
-  // Validate date range if both provided
-  if (start_date && end_date) {
-    const start = new Date(start_date);
-    const end = new Date(end_date);
-    
-    if (start > end) {
-      return res.status(400).json({
-        success: false,
-        message: 'Start date cannot be later than end date'
-      });
-    }
-  }
-  
-  next();
-};
-
-// Validation middleware for leave type and status
-const validateLeaveParams = (req, res, next) => {
-  const { leave_type, status } = req.query;
-  
-  if (leave_type) {
-    const validLeaveTypes = ['sick_leave', 'annual_leave', 'casual_leave', 'maternity_leave', 'paternity_leave'];
-    
-    if (!validLeaveTypes.includes(leave_type)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid leave type. Valid types: ${validLeaveTypes.join(', ')}`
-      });
-    }
-  }
-  
-  if (status) {
-    const validStatuses = ['Pending', 'Approved', 'Rejected', 'Cancelled'];
-    
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Valid statuses: ${validStatuses.join(', ')}`
-      });
-    }
-  }
-  
-  next();
-};
-
-// Content-Type validation middleware
-const validateContentType = (req, res, next) => {
-  if (req.method === 'POST' || req.method === 'PUT') {
-    const contentType = req.get('Content-Type');
-    
-    if (!contentType || !contentType.includes('application/json')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Content-Type must be application/json'
-      });
-    }
-  }
-  
-  next();
-};
-
-// Logging middleware for leave operations
-const logLeaveOperation = (operation) => {
-  return (req, res, next) => {
-    const timestamp = new Date().toISOString();
-    const { staff_id, request_id } = req.params;
-    const queryParams = Object.keys(req.query).length > 0 ? JSON.stringify(req.query) : 'none';
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
-    
-    console.log(`[${timestamp}] ${operation} - Staff: ${staff_id || 'all'} - Request: ${request_id || 'none'} - IP: ${clientIP} - Query: ${queryParams}`);
-    
-    // Log response status after request completion
-    const originalSend = res.send;
-    res.send = function(data) {
-      console.log(`[${timestamp}] ${operation} completed - Status: ${res.statusCode}`);
-      
-      // Log additional details for errors
-      if (res.statusCode >= 400) {
-        try {
-          const parsedData = JSON.parse(data);
-          console.log(`[${timestamp}] ${operation} error details:`, parsedData.message || 'Unknown error');
-        } catch (parseError) {
-          // Ignore parse errors
-        }
-      }
-      
-      originalSend.call(this, data);
-    };
-    
-    next();
-  };
-};
-
-// ===== API ROUTES =====
-
-// Test endpoint
+// 測試端點
 router.get('/test', (req, res) => {
   res.json({
     success: true,
-    message: 'Leave management routes are working properly',
+    message: '請假管理系統運行正常',
     timestamp: new Date().toISOString(),
-    version: '2.0.0',
-    available_endpoints: {
-      quotas: {
-        'GET /quotas': 'Get all staff leave quotas with filtering and pagination',
-        'GET /quotas/:staff_id': 'Get specific staff leave quota',
-        'PUT /quotas/:staff_id': 'Update staff leave quota'
-      },
-      requests: {
-        'GET /requests': 'Get all leave requests with filtering and pagination',
-        'POST /requests': 'Submit new leave request',
-        'GET /requests/pending': 'Get pending leave requests with priority',
-        'PUT /requests/:request_id/cancel': 'Cancel leave request'
-      }
-    },
-    data_types: {
-      staff_id: 'integer',
-      request_id: 'integer',
-      dates: 'YYYY-MM-DD format',
-      leave_types: ['sick_leave', 'annual_leave', 'casual_leave', 'maternity_leave', 'paternity_leave'],
-      statuses: ['Pending', 'Approved', 'Rejected', 'Cancelled']
-    }
+    available_endpoints: [
+      'GET /quotas - HR查看所有配額',
+      'GET /quotas/:staff_id - 查看員工配額',
+      'GET /requests - HR查看所有申請',
+      'GET /requests/staff/:staff_id - 員工查看自己的申請記錄',
+      'POST /requests - 員工提交請假申請',
+      'PUT /requests/:request_id/approve - HR批准申請',
+      'PUT /requests/:request_id/reject - HR拒絕申請'
+    ]
   });
 });
 
-// ===== LEAVE QUOTA MANAGEMENT =====
+// HR功能：查看所有配額
+router.get('/quotas', getAllLeaveQuotas);
 
-// GET /api/holidays/quotas - Get all staff leave quotas
-router.get('/quotas', 
-  validatePagination,
-  validateDateParams,
-  validateLeaveParams,
-  logLeaveOperation('GET_ALL_QUOTAS'),
-  getAllStaffLeaveQuotas
-);
-
-// GET /api/holidays/quotas/:staff_id - Get specific staff leave quota
+// 查看員工配額
 router.get('/quotas/:staff_id', 
   validateStaffId,
-  validateDateParams,
-  logLeaveOperation('GET_STAFF_QUOTA'),
-  getStaffLeaveQuota
+  getMyLeaveQuota
 );
 
-// PUT /api/holidays/quotas/:staff_id - Update staff leave quota
-router.put('/quotas/:staff_id', 
-  validateContentType,
-  validateStaffId,
-  sensitiveOperationLimiter,
-  logLeaveOperation('UPDATE_QUOTA'),
-  updateStaffLeaveQuota
-);
-
-// ===== LEAVE REQUEST MANAGEMENT =====
-
-// GET /api/holidays/requests - Get all leave requests
+// HR功能：查看所有請假申請
 router.get('/requests', 
-  validatePagination,
-  validateDateParams,
-  validateLeaveParams,
-  logLeaveOperation('GET_ALL_REQUESTS'),
   getAllLeaveRequests
 );
 
-// POST /api/holidays/requests - Submit new leave request
+// 員工功能：查看自己的請假記錄
+router.get('/requests/staff/:staff_id', 
+  validateStaffId,
+  getMyLeaveRequests
+);
+
+// 員工功能：提交請假申請
 router.post('/requests',
-  validateContentType,
-  leaveRequestLimiter,
-  logLeaveOperation('SUBMIT_REQUEST'),
+  requestLimiter,
   submitLeaveRequest
 );
 
-// GET /api/holidays/requests/pending - Get pending leave requests
-router.get('/requests/pending', 
-  validatePagination,
-  logLeaveOperation('GET_PENDING_REQUESTS'),
-  getPendingLeaveRequests
-);
-
-// PUT /api/holidays/requests/:request_id/cancel - Cancel leave request
-router.put('/requests/:request_id/cancel',
-  validateContentType,
+// HR功能：批准請假申請
+router.put('/requests/:request_id/approve',
   validateRequestId,
-  sensitiveOperationLimiter,
-  logLeaveOperation('CANCEL_REQUEST'),
-  cancelLeaveRequest
+  approveLeaveRequest
 );
 
-// ===== ERROR HANDLING MIDDLEWARE =====
+// HR功能：拒絕請假申請
+router.put('/requests/:request_id/reject',
+  validateRequestId,
+  rejectLeaveRequest
+);
 
-// Route-specific error handler
+// ===== 錯誤處理 =====
 router.use((err, req, res, next) => {
-  console.error('Leave routes error:', err);
+  console.error('請假路由錯誤:', err);
   
-  // Handle specific error types
-  if (err.name === 'ValidationError') {
+  if (err.code === '23505') {
     return res.status(400).json({
       success: false,
-      message: 'Validation error',
-      details: err.message
+      message: '重複的申請'
     });
   }
   
-  if (err.code === '23505') { // PostgreSQL unique constraint violation
-    return res.status(409).json({
-      success: false,
-      message: 'Duplicate record detected',
-      error_code: 'DUPLICATE_ENTRY'
-    });
-  }
-  
-  if (err.code === '23503') { // PostgreSQL foreign key constraint violation
-    return res.status(400).json({
-      success: false,
-      message: 'Referenced record not found',
-      error_code: 'FOREIGN_KEY_VIOLATION'
-    });
-  }
-  
-  if (err.code === '23514') { // PostgreSQL check constraint violation
-    return res.status(400).json({
-      success: false,
-      message: 'Data violates business rules',
-      error_code: 'CHECK_CONSTRAINT_VIOLATION'
-    });
-  }
-  
-  if (err.code === '22007') { // PostgreSQL invalid date format
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid date format',
-      error_code: 'INVALID_DATE_FORMAT'
-    });
-  }
-  
-  if (err.type === 'entity.parse.failed') {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid JSON in request body',
-      error_code: 'INVALID_JSON'
-    });
-  }
-  
-  if (err.type === 'entity.too.large') {
-    return res.status(413).json({
-      success: false,
-      message: 'Request body too large',
-      error_code: 'PAYLOAD_TOO_LARGE'
-    });
-  }
-  
-  // Default error response
   res.status(500).json({
     success: false,
-    message: 'Internal server error in leave management',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined,
-    timestamp: new Date().toISOString()
+    message: '服務器內部錯誤',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-// 404 handler for unknown leave routes
+// 404處理
 router.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Leave management route not found: ${req.method} ${req.originalUrl}`,
-    available_routes: [
-      'GET /api/holidays/test',
-      'GET /api/holidays/quotas',
-      'GET /api/holidays/quotas/:staff_id',
-      'PUT /api/holidays/quotas/:staff_id',
-      'GET /api/holidays/requests',
-      'POST /api/holidays/requests',
-      'GET /api/holidays/requests/pending',
-      'PUT /api/holidays/requests/:request_id/cancel'
-    ],
-    timestamp: new Date().toISOString()
+    message: `路由不存在: ${req.method} ${req.originalUrl}`
   });
 });
 
 module.exports = router;
-
-console.log('Fixed Leave Management Routes loaded successfully!');

@@ -1,529 +1,125 @@
-// controllers/leaveController.js - Fixed Leave Management Controller
+// controllers/leaveController.js - 簡化的請假管理控制器
+const { get } = require('../app');
 const { query } = require('../config/database');
-const {
-  validateLeaveDates,
-  calculateTotalDays,
-  formatLeaveRequest,
-  formatLeaveQuota,
-  checkLeaveConflict,
-  validateLeaveRequestData,
-  generateLeaveSummary
-} = require('../utils/leaveUtilities');
 
-console.log('Loading Fixed Leave Management Controller...');
+console.log('載入簡化請假管理控制器...');
 
-// ===== HELPER FUNCTIONS =====
+// ===== 工具函數 =====
 
-/**
- * Build dynamic query with filters - Fixed for integer staff_id
- * @param {string} baseQuery - Base SQL query
- * @param {object} filters - Filter object
- * @param {array} baseParams - Base parameters
- * @returns {object} Query object with text and params
- */
-const buildFilteredQuery = (baseQuery, filters, baseParams = []) => {
-  let queryText = baseQuery;
-  const queryParams = [...baseParams];
-  let paramCount = baseParams.length;
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      paramCount++;
-      switch (key) {
-        case 'staff_id':
-          // Fixed: Use exact match for integer staff_id
-          queryText += ` AND l.staff_id = $${paramCount}`;
-          queryParams.push(parseInt(value));
-          break;
-        case 'staff_name':
-          queryText += ` AND s.name ILIKE $${paramCount}`;
-          queryParams.push(`%${value}%`);
-          break;
-        case 'department_id':
-          queryText += ` AND d.department_id = $${paramCount}`;
-          queryParams.push(parseInt(value));
-          break;
-        case 'status':
-          queryText += ` AND lr.status = $${paramCount}`;
-          queryParams.push(value);
-          break;
-        case 'leave_type':
-          queryText += ` AND lr.leave_type = $${paramCount}`;
-          queryParams.push(value);
-          break;
-        case 'start_date':
-          queryText += ` AND lr.start_date >= $${paramCount}`;
-          queryParams.push(value);
-          break;
-        case 'end_date':
-          queryText += ` AND lr.end_date <= $${paramCount}`;
-          queryParams.push(value);
-          break;
-      }
-    }
-  });
-
-  return { queryText, queryParams, paramCount };
+// 計算請假天數
+const calculateTotalDays = (startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const timeDiff = end.getTime() - start.getTime();
+  return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
 };
 
-/**
- * Build filtered query for leave requests - Fixed for integer staff_id
- * @param {string} baseQuery - Base SQL query
- * @param {object} filters - Filter object
- * @param {array} baseParams - Base parameters
- * @returns {object} Query object with text and params
- */
-const buildLeaveRequestQuery = (baseQuery, filters, baseParams = []) => {
-  let queryText = baseQuery;
-  const queryParams = [...baseParams];
-  let paramCount = baseParams.length;
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      paramCount++;
-      switch (key) {
-        case 'staff_id':
-          // Fixed: Use exact match for integer staff_id in leave_requests table
-          queryText += ` AND lr.staff_id = $${paramCount}`;
-          queryParams.push(parseInt(value));
-          break;
-        case 'staff_name':
-          queryText += ` AND s.name ILIKE $${paramCount}`;
-          queryParams.push(`%${value}%`);
-          break;
-        case 'department_id':
-          queryText += ` AND d.department_id = $${paramCount}`;
-          queryParams.push(parseInt(value));
-          break;
-        case 'status':
-          queryText += ` AND lr.status = $${paramCount}`;
-          queryParams.push(value);
-          break;
-        case 'leave_type':
-          queryText += ` AND lr.leave_type = $${paramCount}`;
-          queryParams.push(value);
-          break;
-        case 'start_date':
-          queryText += ` AND lr.start_date >= $${paramCount}`;
-          queryParams.push(value);
-          break;
-        case 'end_date':
-          queryText += ` AND lr.end_date <= $${paramCount}`;
-          queryParams.push(value);
-          break;
-      }
-    }
-  });
-
-  return { queryText, queryParams, paramCount };
+// 格式化請假申請數據
+const formatLeaveRequest = (row) => {
+  // 資料庫格式 -> 前端格式的映射
+  const dbToFrontendMapping = {
+    'Sick Leave': 'sick_leave',
+    'Annual Leave': 'annual_leave',
+    'Casual Leave': 'casual_leave',
+    'Maternity Leave': 'maternity_leave',
+    'Paternity Leave': 'paternity_leave'
+  };
+  
+  return {
+    request_id: row.request_id,
+    staff_id: row.staff_id,
+    staff_name: row.staff_name,
+    department_name: row.department_name,
+    leave_type: dbToFrontendMapping[row.leave_type] || row.leave_type, // 轉換格式
+    start_date: row.start_date,
+    end_date: row.end_date,
+    total_days: row.total_days,
+    reason: row.reason,
+    status: row.status,
+    applied_on: row.applied_on,
+    approved_by: row.approved_by,
+    approved_by_name: row.approved_by_name,
+    approved_on: row.approved_on,
+    rejection_reason: row.rejection_reason,
+    medical_certificate: row.medical_certificate
+  };
 };
 
-/**
- * Get total count for pagination
- * @param {string} baseCountQuery - Base count query
- * @param {object} filters - Filter object
- * @param {array} baseParams - Base parameters
- * @returns {number} Total count
- */
-const getTotalCount = async (baseCountQuery, filters, baseParams = []) => {
-  const { queryText, queryParams } = buildFilteredQuery(baseCountQuery, filters, baseParams);
-  const result = await query(queryText, queryParams);
-  return parseInt(result.rows[0].total_count);
-};
-
-/**
- * Get total count for leave requests
- * @param {string} baseCountQuery - Base count query
- * @param {object} filters - Filter object
- * @param {array} baseParams - Base parameters
- * @returns {number} Total count
- */
-const getLeaveRequestTotalCount = async (baseCountQuery, filters, baseParams = []) => {
-  const { queryText, queryParams } = buildLeaveRequestQuery(baseCountQuery, filters, baseParams);
-  const result = await query(queryText, queryParams);
-  return parseInt(result.rows[0].total_count);
-};
-
-// ===== LEAVE QUOTA MANAGEMENT FUNCTIONS =====
-
-/**
- * Get all staff leave quotas with advanced filtering and pagination
- */
-const getAllStaffLeaveQuotas = async (req, res) => {
-  try {
-    console.log('Request: Get all staff leave quotas with filters');
-    
-    const { 
-      leave_year = new Date().getFullYear(), 
-      department_id, 
-      staff_id,
-      staff_name,
-      limit = 50, 
-      offset = 0,
-      sort_by = 'staff_name',
-      sort_order = 'ASC'
-    } = req.query;
-
-    // Validate sort parameters
-    const validSortFields = ['staff_name', 'department_name', 'leave_year', 'al_remaining', 'sl_remaining'];
-    const validSortOrders = ['ASC', 'DESC'];
-    
-    const sortField = validSortFields.includes(sort_by) ? sort_by : 'staff_name';
-    const sortOrder = validSortOrders.includes(sort_order?.toUpperCase()) ? sort_order.toUpperCase() : 'ASC';
-
-    const baseQuery = `
-      SELECT 
-        l.staff_id,
-        s.name as staff_name,
-        s.email as staff_email,
-        d.department_name,
-        p.title as position_title,
-        l.leave_year,
-        -- Sick leave
-        COALESCE(l.sl_quota, 0) as sl_quota,
-        COALESCE(l.sl_used, 0) as sl_used,
-        COALESCE(l.sl_quota, 0) - COALESCE(l.sl_used, 0) as sl_remaining,
-        -- Annual leave
-        COALESCE(l.al_quota, 0) as al_quota,
-        COALESCE(l.al_used, 0) as al_used,
-        COALESCE(l.al_quota, 0) - COALESCE(l.al_used, 0) as al_remaining,
-        -- Casual leave
-        COALESCE(l.cl_quota, 0) as cl_quota,
-        COALESCE(l.cl_used, 0) as cl_used,
-        COALESCE(l.cl_quota, 0) - COALESCE(l.cl_used, 0) as cl_remaining,
-        -- Maternity leave
-        COALESCE(l.ml_quota, 0) as ml_quota,
-        COALESCE(l.ml_used, 0) as ml_used,
-        COALESCE(l.ml_quota, 0) - COALESCE(l.ml_used, 0) as ml_remaining,
-        -- Paternity leave
-        COALESCE(l.pl_quota, 0) as pl_quota,
-        COALESCE(l.pl_used, 0) as pl_used,
-        COALESCE(l.pl_quota, 0) - COALESCE(l.pl_used, 0) as pl_remaining,
-        -- Total calculations
-        (COALESCE(l.sl_quota, 0) + COALESCE(l.al_quota, 0) + COALESCE(l.cl_quota, 0) + COALESCE(l.ml_quota, 0) + COALESCE(l.pl_quota, 0)) as total_quota,
-        (COALESCE(l.sl_used, 0) + COALESCE(l.al_used, 0) + COALESCE(l.cl_used, 0) + COALESCE(l.ml_used, 0) + COALESCE(l.pl_used, 0)) as total_used,
-        l.last_quota_update,
-        l.created_at,
-        l.updated_at
-      FROM leave l
-      LEFT JOIN staff s ON l.staff_id = s.staff_id
-      LEFT JOIN position p ON s.position_id = p.position_id
-      LEFT JOIN department d ON p.department_id = d.department_id
-      WHERE l.leave_year = $1
-    `;
-
-    const filters = { staff_id, staff_name, department_id };
-    const { queryText, queryParams, paramCount } = buildFilteredQuery(baseQuery, filters, [leave_year]);
-
-    // Add sorting and pagination
-    const finalQuery = `
-      ${queryText} 
-      ORDER BY ${sortField === 'staff_name' ? 's.name' : sortField} ${sortOrder}
-      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
-    `;
-    queryParams.push(parseInt(limit), parseInt(offset));
-
-    const result = await query(finalQuery, queryParams);
-
-    // Get total count
-    const countQuery = `
-      SELECT COUNT(*) as total_count
-      FROM leave l
-      LEFT JOIN staff s ON l.staff_id = s.staff_id
-      LEFT JOIN position p ON s.position_id = p.position_id
-      LEFT JOIN department d ON p.department_id = d.department_id
-      WHERE l.leave_year = $1
-    `;
-
-    const totalCount = await getTotalCount(countQuery, filters, [leave_year]);
-
-    // Format data
-    const formattedData = result.rows.map(row => formatLeaveQuota(row));
-
-    console.log(`Successfully retrieved leave quotas for ${result.rows.length} staff members (total ${totalCount})`);
-
-    res.json({
-      success: true,
-      message: `Successfully retrieved leave quotas for ${result.rows.length} staff members`,
-      data: formattedData,
-      count: result.rows.length,
-      pagination: {
-        total: totalCount,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        has_more: parseInt(offset) + parseInt(limit) < totalCount,
-        total_pages: Math.ceil(totalCount / parseInt(limit)),
-        current_page: Math.floor(parseInt(offset) / parseInt(limit)) + 1
-      },
-      filters: {
-        leave_year: parseInt(leave_year),
-        staff_id: staff_id ? parseInt(staff_id) : null,
-        staff_name: staff_name || null,
-        department_id: department_id ? parseInt(department_id) : null,
-        sort_by: sortField,
-        sort_order: sortOrder
-      }
-    });
-  } catch (error) {
-    console.error('Error retrieving staff leave quotas:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve staff leave quotas',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+// 檢查請假衝突
+const checkLeaveConflict = async (staffId, startDate, endDate, excludeRequestId = null) => {
+  let conflictQuery = `
+    SELECT request_id, start_date, end_date, leave_type, status
+    FROM leave_requests 
+    WHERE staff_id = $1 
+      AND status IN ('Pending', 'Approved')
+      AND (
+        (start_date <= $2 AND end_date >= $2) OR
+        (start_date <= $3 AND end_date >= $3) OR
+        (start_date >= $2 AND end_date <= $3)
+      )
+  `;
+  
+  const params = [staffId, startDate, endDate];
+  
+  if (excludeRequestId) {
+    conflictQuery += ` AND request_id != $4`;
+    params.push(excludeRequestId);
   }
+  
+  const result = await query(conflictQuery, params);
+  return {
+    hasConflict: result.rows.length > 0,
+    conflicts: result.rows
+  };
 };
 
-/**
- * Get specific staff leave quota with detailed information
- */
-const getStaffLeaveQuota = async (req, res) => {
-  try {
-    const { staff_id } = req.params;
-    const { leave_year = new Date().getFullYear() } = req.query;
-    
-    console.log(`Request: Get leave quota for staff ${staff_id}, year ${leave_year}`);
-    
-    // Validate staff_id
-    const staffIdInt = parseInt(staff_id);
-    if (isNaN(staffIdInt)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid staff ID format. Must be a number.'
-      });
-    }
-    
-    const result = await query(`
-      SELECT 
-        l.staff_id,
-        s.name as staff_name,
-        s.email as staff_email,
-        s.hire_date,
-        d.department_name,
-        p.title as position_title,
-        l.leave_year,
-        -- Sick leave
-        COALESCE(l.sl_quota, 0) as sl_quota,
-        COALESCE(l.sl_used, 0) as sl_used,
-        COALESCE(l.sl_quota, 0) - COALESCE(l.sl_used, 0) as sl_remaining,
-        -- Annual leave
-        COALESCE(l.al_quota, 0) as al_quota,
-        COALESCE(l.al_used, 0) as al_used,
-        COALESCE(l.al_quota, 0) - COALESCE(l.al_used, 0) as al_remaining,
-        -- Casual leave
-        COALESCE(l.cl_quota, 0) as cl_quota,
-        COALESCE(l.cl_used, 0) as cl_used,
-        COALESCE(l.cl_quota, 0) - COALESCE(l.cl_used, 0) as cl_remaining,
-        -- Maternity leave
-        COALESCE(l.ml_quota, 0) as ml_quota,
-        COALESCE(l.ml_used, 0) as ml_used,
-        COALESCE(l.ml_quota, 0) - COALESCE(l.ml_used, 0) as ml_remaining,
-        -- Paternity leave
-        COALESCE(l.pl_quota, 0) as pl_quota,
-        COALESCE(l.pl_used, 0) as pl_used,
-        COALESCE(l.pl_quota, 0) - COALESCE(l.pl_used, 0) as pl_remaining,
-        -- Total calculations
-        (COALESCE(l.sl_quota, 0) + COALESCE(l.al_quota, 0) + COALESCE(l.cl_quota, 0) + COALESCE(l.ml_quota, 0) + COALESCE(l.pl_quota, 0)) as total_quota,
-        (COALESCE(l.sl_used, 0) + COALESCE(l.al_used, 0) + COALESCE(l.cl_used, 0) + COALESCE(l.ml_used, 0) + COALESCE(l.pl_used, 0)) as total_used,
-        l.last_quota_update,
-        l.created_at,
-        l.updated_at
-      FROM leave l
-      LEFT JOIN staff s ON l.staff_id = s.staff_id
-      LEFT JOIN position p ON s.position_id = p.position_id
-      LEFT JOIN department d ON p.department_id = d.department_id
-      WHERE l.staff_id = $1 AND l.leave_year = $2
-    `, [staffIdInt, leave_year]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: `Leave record not found for staff ${staff_id} in year ${leave_year}`
-      });
-    }
-
-    // Format data and add additional statistics
-    const formattedData = formatLeaveQuota(result.rows[0]);
-    
-    // Get leave request history for this year
-    const historyResult = await query(`
-      SELECT 
-        COUNT(*) as total_requests,
-        COUNT(CASE WHEN status = 'Approved' THEN 1 END) as approved_requests,
-        COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_requests,
-        COUNT(CASE WHEN status = 'Rejected' THEN 1 END) as rejected_requests,
-        COUNT(CASE WHEN status = 'Cancelled' THEN 1 END) as cancelled_requests
-      FROM leave_requests 
-      WHERE staff_id = $1 AND EXTRACT(YEAR FROM start_date) = $2
-    `, [staffIdInt, leave_year]);
-
-    formattedData.request_statistics = historyResult.rows[0];
-    
-    console.log(`Successfully retrieved leave quota for staff ${staff_id}`);
-    
-    res.json({
-      success: true,
-      message: 'Successfully retrieved staff leave quota',
-      data: formattedData,
-      leave_year: parseInt(leave_year)
-    });
-  } catch (error) {
-    console.error('Error retrieving staff leave quota:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve staff leave quota',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-};
+// ===== 主要功能 =====
 
 /**
- * Update staff leave quota with validation
- */
-const updateStaffLeaveQuota = async (req, res) => {
-  try {
-    const { staff_id } = req.params;
-    const { leave_year = new Date().getFullYear() } = req.query;
-    const updateData = req.body;
-    
-    console.log(`Request: Update leave quota for staff ${staff_id}, year ${leave_year}`);
-    
-    // Validate staff_id
-    const staffIdInt = parseInt(staff_id);
-    if (isNaN(staffIdInt)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid staff ID format. Must be a number.'
-      });
-    }
-    
-    // Validate input data
-    const allowedFields = ['sl_quota', 'al_quota', 'cl_quota', 'ml_quota', 'pl_quota'];
-    const validFields = Object.keys(updateData).filter(field => allowedFields.includes(field));
-    
-    if (validFields.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid fields provided for update',
-        allowed_fields: allowedFields
-      });
-    }
-
-    // Validate quota values
-    for (const field of validFields) {
-      const value = updateData[field];
-      if (typeof value !== 'number' || value < 0 || value > 365) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid value for ${field}. Must be a number between 0 and 365`,
-          received_value: value
-        });
-      }
-    }
-    
-    // Check if quota exists
-    const existingQuota = await query(
-      'SELECT * FROM leave WHERE staff_id = $1 AND leave_year = $2',
-      [staffIdInt, leave_year]
-    );
-    
-    if (existingQuota.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: `Leave quota for staff ${staff_id} in year ${leave_year} not found`
-      });
-    }
-    
-    // Build update query
-    const updateFields = [];
-    const updateValues = [];
-    let paramCount = 0;
-    
-    validFields.forEach(field => {
-      paramCount++;
-      updateFields.push(`${field} = $${paramCount}`);
-      updateValues.push(updateData[field]);
-    });
-    
-    // Add timestamps
-    paramCount++;
-    updateFields.push(`updated_at = $${paramCount}`);
-    updateValues.push(new Date());
-    
-    paramCount++;
-    updateFields.push(`last_quota_update = $${paramCount}`);
-    updateValues.push(new Date());
-    
-    // Add WHERE conditions
-    paramCount++;
-    updateValues.push(staffIdInt);
-    paramCount++;
-    updateValues.push(leave_year);
-    
-    const updateQuery = `
-      UPDATE leave 
-      SET ${updateFields.join(', ')}
-      WHERE staff_id = $${paramCount - 1} AND leave_year = $${paramCount}
-      RETURNING *
-    `;
-    
-    const result = await query(updateQuery, updateValues);
-    const formattedData = formatLeaveQuota(result.rows[0]);
-    
-    console.log(`Successfully updated leave quota for staff ${staff_id}`);
-    
-    res.json({
-      success: true,
-      message: 'Leave quota updated successfully',
-      data: formattedData,
-      updated_fields: validFields
-    });
-  } catch (error) {
-    console.error('Error updating staff leave quota:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update staff leave quota',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-};
-
-// ===== LEAVE REQUEST MANAGEMENT FUNCTIONS =====
-
-/**
- * Get all leave requests with advanced filtering
+ * HR查看所有請假申請
  */
 const getAllLeaveRequests = async (req, res) => {
   try {
-    console.log('Request: Get all leave requests with filters');
+    const { status, leave_type, start_date, end_date, limit = 50, offset = 0 } = req.query;
     
-    const { 
-      status, 
-      staff_id, 
-      leave_type, 
-      start_date, 
-      end_date, 
-      limit = 50, 
-      offset = 0,
-      sort_by = 'applied_on',
-      sort_order = 'DESC'
-    } = req.query;
-
-    // Validate sort parameters
-    const validSortFields = ['applied_on', 'start_date', 'staff_name', 'status', 'total_days'];
-    const validSortOrders = ['ASC', 'DESC'];
+    let whereConditions = [];
+    let queryParams = [];
+    let paramCount = 0;
     
-    const sortField = validSortFields.includes(sort_by) ? sort_by : 'applied_on';
-    const sortOrder = validSortOrders.includes(sort_order?.toUpperCase()) ? sort_order.toUpperCase() : 'DESC';
-
-    const baseQuery = `
+    // 構建篩選條件
+    if (status) {
+      paramCount++;
+      whereConditions.push(`lr.status = $${paramCount}`);
+      queryParams.push(status);
+    }
+    
+    if (leave_type) {
+      paramCount++;
+      whereConditions.push(`lr.leave_type = $${paramCount}`);
+      queryParams.push(leave_type);
+    }
+    
+    if (start_date) {
+      paramCount++;
+      whereConditions.push(`lr.start_date >= $${paramCount}`);
+      queryParams.push(start_date);
+    }
+    
+    if (end_date) {
+      paramCount++;
+      whereConditions.push(`lr.end_date <= $${paramCount}`);
+      queryParams.push(end_date);
+    }
+    
+    const whereClause = whereConditions.length > 0 ? 
+      'WHERE ' + whereConditions.join(' AND ') : '';
+    
+    const mainQuery = `
       SELECT 
         lr.request_id,
         lr.staff_id,
         s.name as staff_name,
-        s.email as staff_email,
         d.department_name,
-        p.title as position_title,
         lr.leave_type,
         lr.start_date,
         lr.end_date,
@@ -535,452 +131,497 @@ const getAllLeaveRequests = async (req, res) => {
         approver.name as approved_by_name,
         lr.approved_on,
         lr.rejection_reason,
-        lr.emergency_contact,
         lr.medical_certificate,
-        lr.created_at,
-        lr.updated_at,
-        -- Calculate days until start
+        -- 計算優先級
         CASE 
-          WHEN lr.start_date >= CURRENT_DATE THEN lr.start_date - CURRENT_DATE
-          ELSE 0 
-        END as days_until_start,
-        -- Calculate days since application
-        CURRENT_DATE - lr.applied_on::date as days_since_applied
+          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '1 day' AND lr.status = 'Pending' THEN 'urgent'
+          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '3 days' AND lr.status = 'Pending' THEN 'high'
+          WHEN lr.status = 'Pending' THEN 'medium'
+          ELSE 'normal'
+        END as priority
       FROM leave_requests lr
       LEFT JOIN staff s ON lr.staff_id = s.staff_id
       LEFT JOIN staff approver ON lr.approved_by = approver.staff_id
       LEFT JOIN position p ON s.position_id = p.position_id
       LEFT JOIN department d ON p.department_id = d.department_id
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY 
+        CASE lr.status 
+          WHEN 'Pending' THEN 1 
+          WHEN 'Approved' THEN 2 
+          WHEN 'Rejected' THEN 3 
+          ELSE 4 
+        END,
+        lr.applied_on DESC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `;
-
-    const filters = { status, staff_id, leave_type, start_date, end_date };
-    const { queryText, queryParams, paramCount } = buildLeaveRequestQuery(baseQuery, filters);
-
-    // Add sorting and pagination
-    const sortColumn = sortField === 'staff_name' ? 's.name' : `lr.${sortField}`;
-    const finalQuery = `
-      ${queryText} 
-      ORDER BY ${sortColumn} ${sortOrder}, lr.request_id DESC
-      LIMIT ${paramCount + 1} OFFSET ${paramCount + 2}
-    `;
+    
     queryParams.push(parseInt(limit), parseInt(offset));
-
-    const result = await query(finalQuery, queryParams);
-
-    // Get total count
+    
+    const result = await query(mainQuery, queryParams);
+    
+    // 獲取總數
     const countQuery = `
-      SELECT COUNT(*) as total_count
+      SELECT COUNT(*) as total
       FROM leave_requests lr
       LEFT JOIN staff s ON lr.staff_id = s.staff_id
       LEFT JOIN position p ON s.position_id = p.position_id
       LEFT JOIN department d ON p.department_id = d.department_id
-      WHERE 1=1
+      ${whereClause}
     `;
-
-    const totalCount = await getLeaveRequestTotalCount(countQuery, filters);
-
-    // Format data and generate summary
-    const formattedData = result.rows.map(row => formatLeaveRequest(row));
-    const summary = generateLeaveSummary(result.rows);
-
-    console.log(`Successfully retrieved ${result.rows.length} leave requests (total ${totalCount})`);
-
+    
+    const countResult = await query(countQuery, queryParams.slice(0, -2));
+    const total = parseInt(countResult.rows[0].total);
+    
+    const formattedData = result.rows.map(formatLeaveRequest);
+    
+    // 統計信息
+    const stats = {
+      total: formattedData.length,
+      pending: formattedData.filter(r => r.status === 'Pending').length,
+      approved: formattedData.filter(r => r.status === 'Approved').length,
+      rejected: formattedData.filter(r => r.status === 'Rejected').length
+    };
+    
+    console.log(`HR查看了${formattedData.length}個請假申請`);
+    
     res.json({
       success: true,
-      message: `Successfully retrieved ${result.rows.length} leave requests`,
+      message: `成功獲取${formattedData.length}個請假申請`,
       data: formattedData,
-      summary,
+      statistics: stats,
       pagination: {
-        total: totalCount,
+        total,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        has_more: parseInt(offset) + parseInt(limit) < totalCount,
-        total_pages: Math.ceil(totalCount / parseInt(limit)),
-        current_page: Math.floor(parseInt(offset) / parseInt(limit)) + 1
-      },
-      filters: {
-        status: status || null,
-        staff_id: staff_id ? parseInt(staff_id) : null,
-        leave_type: leave_type || null,
-        start_date: start_date || null,
-        end_date: end_date || null,
-        sort_by: sortField,
-        sort_order: sortOrder
+        has_more: parseInt(offset) + parseInt(limit) < total
       }
     });
+    
   } catch (error) {
-    console.error('Error retrieving leave requests:', error);
+    console.error('獲取請假申請失敗:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve leave requests',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: '獲取請假申請失敗',
+      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
     });
   }
 };
 
 /**
- * Get pending leave requests with priority information
+ * 員工查看自己的請假記錄
  */
-const getPendingLeaveRequests = async (req, res) => {
+const getMyLeaveRequests = async (req, res) => {
   try {
-    console.log('Request: Get pending leave requests with priority');
+    const { staff_id } = req.params;
+    const { status, limit = 20, offset = 0 } = req.query;
+    
+    let whereConditions = ['lr.staff_id = $1'];
+    let queryParams = [parseInt(staff_id)];
+    let paramCount = 1;
+    
+    if (status) {
+      paramCount++;
+      whereConditions.push(`lr.status = $${paramCount}`);
+      queryParams.push(status);
+    }
+    
+    const whereClause = 'WHERE ' + whereConditions.join(' AND ');
     
     const result = await query(`
       SELECT 
         lr.request_id,
         lr.staff_id,
         s.name as staff_name,
-        s.email as staff_email,
-        d.department_name,
-        p.title as position_title,
         lr.leave_type,
         lr.start_date,
         lr.end_date,
         lr.total_days,
         lr.reason,
+        lr.status,
         lr.applied_on,
-        lr.emergency_contact,
-        lr.medical_certificate,
-        -- Calculate urgency indicators
-        CURRENT_DATE - lr.applied_on::date as days_pending,
-        CASE 
-          WHEN lr.start_date >= CURRENT_DATE THEN lr.start_date - CURRENT_DATE
-          ELSE 0 
-        END as days_until_start,
-        -- Priority calculation
-        CASE
-          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '1 day' THEN 'urgent'
-          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '3 days' OR 
-               CURRENT_DATE - lr.applied_on::date >= 7 THEN 'high'
-          WHEN CURRENT_DATE - lr.applied_on::date >= 3 THEN 'medium'
-          ELSE 'normal'
-        END as priority_level
+        lr.approved_by,
+        approver.name as approved_by_name,
+        lr.approved_on,
+        lr.rejection_reason,
+        lr.medical_certificate
       FROM leave_requests lr
       LEFT JOIN staff s ON lr.staff_id = s.staff_id
-      LEFT JOIN position p ON s.position_id = p.position_id
-      LEFT JOIN department d ON p.department_id = d.department_id
-      WHERE lr.status = 'Pending'
-      ORDER BY 
-        CASE 
-          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '1 day' THEN 1
-          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '3 days' THEN 2
-          WHEN CURRENT_DATE - lr.applied_on::date >= 7 THEN 3
-          WHEN CURRENT_DATE - lr.applied_on::date >= 3 THEN 4
-          ELSE 5
-        END,
-        lr.applied_on ASC
-    `);
+      LEFT JOIN staff approver ON lr.approved_by = approver.staff_id
+      ${whereClause}
+      ORDER BY lr.applied_on DESC
+      LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+    `, [...queryParams, parseInt(limit), parseInt(offset)]);
     
-    // Format data with priority information
-    const formattedData = result.rows.map(row => ({
-      ...formatLeaveRequest(row),
-      priority: {
-        level: row.priority_level,
-        days_pending: parseInt(row.days_pending),
-        days_until_start: parseInt(row.days_until_start),
-        urgent: row.priority_level === 'urgent'
-      }
-    }));
-
-    // Group by priority
-    const priorityGroups = {
-      urgent: formattedData.filter(req => req.priority.level === 'urgent'),
-      high: formattedData.filter(req => req.priority.level === 'high'),
-      medium: formattedData.filter(req => req.priority.level === 'medium'),
-      normal: formattedData.filter(req => req.priority.level === 'normal')
-    };
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: '暫無請假記錄',
+        data: [],
+        count: 0
+      });
+    }
     
-    console.log(`Successfully retrieved ${result.rows.length} pending leave requests`);
+    const formattedData = result.rows.map(formatLeaveRequest);
+    
+    console.log(`員工 ${staff_id} 查看了自己的請假記錄`);
     
     res.json({
       success: true,
-      message: `Successfully retrieved ${result.rows.length} pending leave requests`,
+      message: `成功獲取${formattedData.length}條請假記錄`,
       data: formattedData,
-      count: result.rows.length,
-      priority_breakdown: {
-        urgent: priorityGroups.urgent.length,
-        high: priorityGroups.high.length,
-        medium: priorityGroups.medium.length,
-        normal: priorityGroups.normal.length
-      },
-      grouped_by_priority: priorityGroups
+      count: formattedData.length
     });
+    
   } catch (error) {
-    console.error('Error retrieving pending leave requests:', error);
+    console.error('獲取員工請假記錄失敗:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve pending leave requests',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: '獲取請假記錄失敗',
+      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
     });
   }
 };
 
 /**
- * Submit new leave request with comprehensive validation
+ * 員工提交請假申請
  */
 const submitLeaveRequest = async (req, res) => {
   try {
-    console.log('Request: Submit new leave request');
-    console.log('Request body:', req.body);
+    const { staff_id, leave_type, start_date, end_date, reason, medical_certificate } = req.body;
     
-    const requestData = req.body;
-    
-    // Basic validation
-    const errors = [];
-    
-    if (!requestData.staff_id) {
-      errors.push('Staff ID is required');
-    } else {
-      const staffIdInt = parseInt(requestData.staff_id);
-      if (isNaN(staffIdInt)) {
-        errors.push('Staff ID must be a valid number');
-      } else {
-        requestData.staff_id = staffIdInt;
-      }
-    }
-    
-    if (!requestData.leave_type) {
-      errors.push('Leave type is required');
-    } else {
-      const validLeaveTypes = ['sick_leave', 'annual_leave', 'casual_leave', 'maternity_leave', 'paternity_leave'];
-      if (!validLeaveTypes.includes(requestData.leave_type)) {
-        errors.push(`Invalid leave type. Valid types: ${validLeaveTypes.join(', ')}`);
-      }
-    }
-    
-    if (!requestData.start_date) {
-      errors.push('Start date is required');
-    }
-    
-    if (!requestData.end_date) {
-      errors.push('End date is required');
-    }
-    
-    if (!requestData.reason || !requestData.reason.trim()) {
-      errors.push('Leave reason is required');
-    } else if (requestData.reason.trim().length < 10) {
-      errors.push('Leave reason must be at least 10 characters');
-    }
-
-    // Date validation
-    if (requestData.start_date && requestData.end_date) {
-      const startDate = new Date(requestData.start_date);
-      const endDate = new Date(requestData.end_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (isNaN(startDate.getTime())) {
-        errors.push('Invalid start date format');
-      }
-      
-      if (isNaN(endDate.getTime())) {
-        errors.push('Invalid end date format');
-      }
-      
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        if (startDate > endDate) {
-          errors.push('Start date cannot be later than end date');
-        }
-        
-        if (startDate < today) {
-          errors.push('Start date cannot be in the past');
-        }
-        
-        // Check if date is too far in the future (more than 2 years)
-        const twoYearsLater = new Date();
-        twoYearsLater.setFullYear(twoYearsLater.getFullYear() + 2);
-        
-        if (endDate > twoYearsLater) {
-          errors.push('End date cannot be more than two years in the future');
-        }
-      }
-    }
-
-    if (errors.length > 0) {
+    // 基本驗證
+    if (!staff_id || !leave_type || !start_date || !end_date || !reason?.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Validation failed',
-        errors: errors
+        message: '請填寫所有必填字段'
       });
     }
-
-    // Check if staff exists
-    const staffCheck = await query(
-      'SELECT staff_id, name FROM staff WHERE staff_id = $1',
-      [requestData.staff_id]
-    );
     
+    // 驗證員工存在
+    const staffCheck = await query('SELECT staff_id, name FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
     if (staffCheck.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `Staff ID ${requestData.staff_id} does not exist`
+        message: '員工不存在'
       });
     }
-
-    // Calculate total days
-    const totalDays = calculateTotalDays(requestData.start_date, requestData.end_date);
     
-    // Check for conflicts
-    const conflictCheck = await checkLeaveConflict(
-      requestData.staff_id,
-      requestData.start_date,
-      requestData.end_date
-    );
-
-    if (conflictCheck.hasConflict) {
-      return res.status(409).json({
+    // 驗證日期
+    const startDate = new Date(start_date);
+    const endDate = new Date(end_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (startDate < today) {
+      return res.status(400).json({
         success: false,
-        message: 'Leave request conflicts with existing requests',
-        conflicting_requests: conflictCheck.conflictingRequests
+        message: '開始日期不能是過去的日期'
       });
     }
-
-    // Insert new request
-    const insertQuery = `
+    
+    if (startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: '開始日期不能晚於結束日期'
+      });
+    }
+    
+    // 檢查衝突
+    const conflictCheck = await checkLeaveConflict(staff_id, start_date, end_date);
+    if (conflictCheck.hasConflict) {
+      return res.status(400).json({
+        success: false,
+        message: '申請時間與現有請假記錄衝突',
+        conflicts: conflictCheck.conflicts
+      });
+    }
+    
+    // 計算天數
+    const totalDays = calculateTotalDays(start_date, end_date);
+    
+    // 創建申請
+    const result = await query(`
       INSERT INTO leave_requests (
         staff_id, leave_type, start_date, end_date, total_days,
-        reason, emergency_contact, medical_certificate, status, applied_on
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Pending', CURRENT_TIMESTAMP)
-      RETURNING *
-    `;
-
-    const result = await query(insertQuery, [
-      requestData.staff_id,
-      requestData.leave_type,
-      requestData.start_date,
-      requestData.end_date,
-      totalDays,
-      requestData.reason.trim(),
-      requestData.emergency_contact || null,
-      requestData.medical_certificate || false
+        reason, medical_certificate, status, applied_on
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending', CURRENT_TIMESTAMP)
+      RETURNING request_id, staff_id, leave_type, start_date, end_date, 
+                total_days, reason, status, applied_on
+    `, [
+      parseInt(staff_id), leave_type, start_date, end_date, 
+      totalDays, reason.trim(), medical_certificate || false
     ]);
-
-    const formattedData = formatLeaveRequest(result.rows[0]);
-
-    console.log(`Successfully submitted leave request for staff ${requestData.staff_id}`);
-
+    
+    const newRequest = result.rows[0];
+    newRequest.staff_name = staffCheck.rows[0].name;
+    
+    console.log(`員工 ${staff_id} 提交了新的請假申請`);
+    
     res.status(201).json({
       success: true,
-      message: 'Leave request submitted successfully',
-      data: formattedData,
-      request_id: result.rows[0].request_id
+      message: '請假申請提交成功',
+      data: formatLeaveRequest(newRequest)
     });
+    
   } catch (error) {
-    console.error('Error submitting leave request:', error);
+    console.error('提交請假申請失敗:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to submit leave request',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: '提交請假申請失敗',
+      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
     });
   }
 };
 
 /**
- * Cancel leave request
+ * HR批准請假申請
  */
-const cancelLeaveRequest = async (req, res) => {
+const approveLeaveRequest = async (req, res) => {
   try {
     const { request_id } = req.params;
-    const { staff_id, reason } = req.body;
+    const { approved_by, comments } = req.body;
     
-    console.log(`Request: Cancel leave request ${request_id} by staff ${staff_id}`);
-    
-    // Validate request_id
-    const requestIdInt = parseInt(request_id);
-    if (isNaN(requestIdInt)) {
+    if (!approved_by) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid request ID format'
+        message: '需要提供批准人ID'
       });
     }
     
-    // Validate staff_id
-    const staffIdInt = parseInt(staff_id);
-    if (isNaN(staffIdInt)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid staff ID format'
-      });
-    }
-    
-    // Check if request exists and belongs to the staff
-    const requestCheck = await query(
-      'SELECT * FROM leave_requests WHERE request_id = $1 AND staff_id = $2',
-      [requestIdInt, staffIdInt]
-    );
+    // 檢查申請是否存在且為待審批狀態
+    const requestCheck = await query(`
+      SELECT lr.*, s.name as staff_name 
+      FROM leave_requests lr
+      LEFT JOIN staff s ON lr.staff_id = s.staff_id
+      WHERE lr.request_id = $1
+    `, [parseInt(request_id)]);
     
     if (requestCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Leave request not found or does not belong to this staff member'
+        message: '請假申請不存在'
       });
     }
     
     const leaveRequest = requestCheck.rows[0];
     
-    // Check if request can be cancelled (only pending requests)
     if (leaveRequest.status !== 'Pending') {
       return res.status(400).json({
         success: false,
-        message: `Cannot cancel request with status: ${leaveRequest.status}. Only pending requests can be cancelled.`
+        message: `只能批准待審批的申請，當前狀態：${leaveRequest.status}`
       });
     }
     
-    // Check if leave has already started
-    const today = new Date();
-    const startDate = new Date(leaveRequest.start_date);
-    
-    if (startDate <= today) {
+    // 檢查批准人是否存在
+    const approverCheck = await query('SELECT name FROM staff WHERE staff_id = $1', [parseInt(approved_by)]);
+    if (approverCheck.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot cancel leave request as the leave period has already started'
+        message: '批准人不存在'
       });
     }
     
-    // Update request status to cancelled
-    const updateQuery = `
+    // 更新申請狀態
+    const result = await query(`
       UPDATE leave_requests 
-      SET status = 'Cancelled', 
-          rejection_reason = $1,
+      SET status = 'Approved', 
+          approved_by = $1, 
+          approved_on = CURRENT_TIMESTAMP,
+          rejection_reason = $2,
           updated_at = CURRENT_TIMESTAMP
-      WHERE request_id = $2
+      WHERE request_id = $3
       RETURNING *
-    `;
+    `, [parseInt(approved_by), comments, parseInt(request_id)]);
     
-    const result = await query(updateQuery, [
-      reason || 'Cancelled by staff member',
-      requestIdInt
-    ]);
+    const updatedRequest = result.rows[0];
+    updatedRequest.staff_name = leaveRequest.staff_name;
+    updatedRequest.approved_by_name = approverCheck.rows[0].name;
     
-    const formattedData = formatLeaveRequest(result.rows[0]);
-    
-    console.log(`Successfully cancelled leave request ${request_id}`);
+    console.log(`HR批准了請假申請 ${request_id}`);
     
     res.json({
       success: true,
-      message: 'Leave request cancelled successfully',
-      data: formattedData
+      message: '請假申請已批准',
+      data: formatLeaveRequest(updatedRequest)
     });
+    
   } catch (error) {
-    console.error('Error cancelling leave request:', error);
+    console.error('批准請假申請失敗:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to cancel leave request',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: '批准請假申請失敗',
+      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
     });
   }
 };
 
-// ===== EXPORT FUNCTIONS =====
-module.exports = {
-  getAllStaffLeaveQuotas,
-  getStaffLeaveQuota,
-  updateStaffLeaveQuota,
-  getAllLeaveRequests,
-  getPendingLeaveRequests,
-  submitLeaveRequest,
-  cancelLeaveRequest
+/**
+ * HR拒絕請假申請
+ */
+const rejectLeaveRequest = async (req, res) => {
+  try {
+    const { request_id } = req.params;
+    const { rejected_by, reason } = req.body;
+    
+    if (!rejected_by || !reason?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: '需要提供拒絕人ID和拒絕原因'
+      });
+    }
+    
+    // 檢查申請是否存在且為待審批狀態
+    const requestCheck = await query(`
+      SELECT lr.*, s.name as staff_name 
+      FROM leave_requests lr
+      LEFT JOIN staff s ON lr.staff_id = s.staff_id
+      WHERE lr.request_id = $1
+    `, [parseInt(request_id)]);
+    
+    if (requestCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '請假申請不存在'
+      });
+    }
+    
+    const leaveRequest = requestCheck.rows[0];
+    
+    if (leaveRequest.status !== 'Pending') {
+      return res.status(400).json({
+        success: false,
+        message: `只能拒絕待審批的申請，當前狀態：${leaveRequest.status}`
+      });
+    }
+    
+    // 檢查拒絕人是否存在
+    const rejecterCheck = await query('SELECT name FROM staff WHERE staff_id = $1', [parseInt(rejected_by)]);
+    if (rejecterCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '拒絕人不存在'
+      });
+    }
+    
+    // 更新申請狀態
+    const result = await query(`
+      UPDATE leave_requests 
+      SET status = 'Rejected', 
+          approved_by = $1, 
+          approved_on = CURRENT_TIMESTAMP,
+          rejection_reason = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE request_id = $3
+      RETURNING *
+    `, [parseInt(rejected_by), reason.trim(), parseInt(request_id)]);
+    
+    const updatedRequest = result.rows[0];
+    updatedRequest.staff_name = leaveRequest.staff_name;
+    updatedRequest.approved_by_name = rejecterCheck.rows[0].name;
+    
+    console.log(`HR拒絕了請假申請 ${request_id}`);
+    
+    res.json({
+      success: true,
+      message: '請假申請已拒絕',
+      data: formatLeaveRequest(updatedRequest)
+    });
+    
+  } catch (error) {
+    console.error('拒絕請假申請失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '拒絕請假申請失敗',
+      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+    });
+  }
 };
 
-console.log('Fixed Leave Management Controller loaded successfully!');
+// 正確 - 路由處理函數格式
+const getAllLeaveQuotas = async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM leave');
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('獲取所有請假配額失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '獲取配額失敗'
+    });
+  }
+};
+
+const getMyLeaveQuota = async (req, res) => {
+  try {
+    const { staff_id } = req.params;
+    const result = await query(`
+      SELECT 
+        al_quota, al_used, (al_quota - al_used) as al_remaining,
+        sl_quota, sl_used, (sl_quota - sl_used) as sl_remaining,
+        cl_quota, cl_used, (cl_quota - cl_used) as cl_remaining,
+        ml_quota, ml_used, (ml_quota - ml_used) as ml_remaining,
+        pl_quota, pl_used, (pl_quota - pl_used) as pl_remaining
+      FROM leave
+      WHERE staff_id = $1
+    `, [parseInt(staff_id)]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到該員工的配額記錄'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: result.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('獲取請假配額失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: '獲取配額失敗'
+    });
+  }
+};
+
+const getMyLeaveQuota = async (staffId) => {
+  try {
+    const result = await query(`
+      SELECT 
+        al_quota,
+        sl_quota,
+        maternity_leave_quota,
+        paternity_leave_quota
+      FROM leave
+      WHERE staff_id = $1
+    `, [parseInt(staffId)]);
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    return result.rows[0];
+    
+  } catch (error) {
+    console.error('獲取請假配額失敗:', error);
+    return null;
+  }
+};
+
+module.exports = {
+  getAllLeaveRequests,
+  getMyLeaveRequests,
+  submitLeaveRequest,
+  approveLeaveRequest,
+  rejectLeaveRequest,
+  getAllLeaveQuotas,
+  getMyLeaveQuota
+};
+
+console.log('簡化請假管理控制器載入成功!');

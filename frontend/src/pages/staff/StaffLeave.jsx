@@ -27,45 +27,31 @@ const StaffLeave = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Current user (should get from JWT token or context)
-  const currentUser = {
-    staff_id: 100001,
-    name: "John Doe",
-    email: "john.doe@company.com",
-    role: "Employee"
-  };
-
-  // Mock data for testing
   useEffect(() => {
-    setLeaveQuota({
-      al_remaining: 15,
-      sl_remaining: 10,
-      cl_remaining: 5
-    });
-    setLeaveRequests([]);
-    setLoading(false);
+    fetchLeaveData();
   }, []);
 
   const fetchLeaveData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Fetch leave quota
-      const quotaResponse = await fetch(`/api/holidays/quotas/${currentUser.staff_id}`);
-      if (quotaResponse.ok) {
-        const quotaData = await quotaResponse.json();
-        setLeaveQuota(quotaData.data);
-      }
-
-      // Fetch leave requests
-      const requestsResponse = await fetch(`/api/holidays/requests?staff_id=${currentUser.staff_id}`);
-      if (requestsResponse.ok) {
-        const requestsData = await requestsResponse.json();
-        setLeaveRequests(requestsData.data || []);
+      // 使用正確的員工專用端點
+      const response = await fetch(`/api/holidays/requests/staff/${currentUser.staff_id}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setLeaveRequests(data.data || []);
+        } else {
+          setError(data.message || '獲取請假記錄失敗');
+        }
+      } else {
+        throw new Error(`HTTP錯誤: ${response.status}`);
       }
 
     } catch (err) {
-      setError('Unable to load leave data');
+      setError('無法載入請假數據');
       console.error('Error fetching leave data:', err);
     } finally {
       setLoading(false);
