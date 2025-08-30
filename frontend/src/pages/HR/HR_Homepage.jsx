@@ -1,4 +1,4 @@
-// HR_Homepage.jsx - 完整版本
+// HR_Homepage.jsx - Fixed Route Configuration
 import { Routes, Route } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { 
@@ -9,7 +9,6 @@ import {
   Building2, 
   DollarSign,
   ArrowRight,
-  Bell,
   TrendingUp
 } from 'lucide-react';
 import Header from '../../components/Header.jsx';
@@ -347,39 +346,24 @@ const DashboardHome = () => {
   );
 };
 
-// HR_Homepage.jsx - 修正後的路由配置
+// HR_Homepage.jsx - Fixed Route Configuration
 export default function Homepage() {
-  console.log('✅ HR Homepage component loaded');
+  console.log('HR Homepage component loaded');
   
   return (
     <Layout>
       <Routes>
-        <Route path="*" element={<DashboardHome />} />
+        {/* Specific routes MUST come before wildcard */}
         <Route path="/" element={<DashboardHome />} />
         <Route path="/staff" element={<Staffinfo />} />
         <Route path="/staffinfo" element={<Staffinfo />} />
         <Route path="/user-accounts" element={<UserAccount />} />
         <Route path="/attendance" element={<Attendance />} />
-        <Route path="/salary" element={<Salary />} />
         <Route path="/leave-management/*" element={<LeaveManagement />} />
-        <Route path="/payroll" element={<Payroll />} />
+        <Route path="/salary" element={<Salary />} />
         <Route path="/position" element={<Position />} />
         <Route path="/department" element={<Department />} />
-        <Route path="/settings" element={
-          <div style={{
-            padding: '3rem',
-            textAlign: 'center',
-            backgroundColor: 'white',
-            margin: '2rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}>
-            <h2 style={{ color: '#254e70', marginBottom: '1rem' }}>System Settings</h2>
-            <p style={{ color: '#6b7280' }}>Coming soon...</p>
-          </div>
-        } />
-        {/* 移除這行！這是造成問題的根源 */}
-        {/* <Route path="/login" element={<LoginForm />} /> */}
+        <Route path="/payroll" element={<Payroll />} />
       </Routes>
     </Layout>
   );

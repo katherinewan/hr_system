@@ -1,32 +1,34 @@
-// routes/leaveRoutes.js - 簡化的請假管理路由
+// routes/leaveRoutes.js - Updated Leave Management Routes
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 
-// 導入控制器
+// Import controllers
 const { 
   getAllLeaveRequests,
+  getPendingRequests,
   getMyLeaveRequests,
   submitLeaveRequest,
   approveLeaveRequest,
   rejectLeaveRequest,
+  cancelLeaveRequest,
   getAllLeaveQuotas,
   getMyLeaveQuota
 } = require('../controllers/leaveController');
 
-console.log('載入簡化請假管理路由...');
+console.log('Loading leave management routes...');
 
-// ===== 速率限制 =====
+// ===== Rate Limiting =====
 const requestLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15分鐘
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20,
   message: {
     success: false,
-    message: '請求過於頻繁，請稍後再試'
+    message: 'Too many requests, please try again later'
   }
 });
 
-// ===== 驗證中間件 =====
+// ===== Validation Middleware =====
 const validateStaffId = (req, res, next) => {
   const { staff_id } = req.params;
   const staffIdInt = parseInt(staff_id);
@@ -34,7 +36,7 @@ const validateStaffId = (req, res, next) => {
   if (isNaN(staffIdInt) || staffIdInt <= 0) {
     return res.status(400).json({
       success: false,
-      message: '無效的員工ID'
+      message: 'Invalid staff ID'
     });
   }
   
@@ -49,7 +51,7 @@ const validateRequestId = (req, res, next) => {
   if (isNaN(requestIdInt) || requestIdInt <= 0) {
     return res.status(400).json({
       success: false,
-      message: '無效的申請ID'
+      message: 'Invalid request ID'
     });
   }
   
@@ -57,87 +59,108 @@ const validateRequestId = (req, res, next) => {
   next();
 };
 
-// ===== 路由定義 =====
+// ===== Route Definitions =====
 
-// 測試端點
+// Test endpoint
 router.get('/test', (req, res) => {
   res.json({
     success: true,
-    message: '請假管理系統運行正常',
+    message: 'Leave management system is running normally',
     timestamp: new Date().toISOString(),
     available_endpoints: [
-      'GET /quotas - HR查看所有配額',
-      'GET /quotas/:staff_id - 查看員工配額',
-      'GET /requests - HR查看所有申請',
-      'GET /requests/staff/:staff_id - 員工查看自己的申請記錄',
-      'POST /requests - 員工提交請假申請',
-      'PUT /requests/:request_id/approve - HR批准申請',
-      'PUT /requests/:request_id/reject - HR拒絕申請'
+      'GET /quotas - HR view all quotas',
+      'GET /quotas/:staff_id - View staff quota',
+      'GET /requests - HR view all requests',
+      'GET /requests/pending - HR view pending requests',
+      'GET /requests/staff/:staff_id - Staff view own leave records',
+      'POST /requests - Staff submit leave request',
+      'PUT /requests/:request_id/approve - HR approve request',
+      'PUT /requests/:request_id/reject - HR reject request',
+      'PUT /requests/:request_id/cancel - Staff cancel request'
     ]
   });
 });
 
-// HR功能：查看所有配額
+// HR function: View all quotas
 router.get('/quotas', getAllLeaveQuotas);
 
-// 查看員工配額
+// View staff quota
 router.get('/quotas/:staff_id', 
   validateStaffId,
   getMyLeaveQuota
 );
 
-// HR功能：查看所有請假申請
-router.get('/requests', 
-  getAllLeaveRequests
-);
+// HR function: View all leave requests
+router.get('/requests', getAllLeaveRequests);
 
-// 員工功能：查看自己的請假記錄
+// HR function: View pending requests specifically
+router.get('/requests/pending', getPendingRequests);
+
+// Staff function: View own leave records
 router.get('/requests/staff/:staff_id', 
   validateStaffId,
   getMyLeaveRequests
 );
 
-// 員工功能：提交請假申請
+// Staff function: Submit leave request
 router.post('/requests',
   requestLimiter,
   submitLeaveRequest
 );
 
-// HR功能：批准請假申請
+// HR function: Approve leave request
 router.put('/requests/:request_id/approve',
   validateRequestId,
   approveLeaveRequest
 );
 
-// HR功能：拒絕請假申請
+// HR function: Reject leave request
 router.put('/requests/:request_id/reject',
   validateRequestId,
   rejectLeaveRequest
 );
 
-// ===== 錯誤處理 =====
+// Staff function: Cancel leave request
+router.put('/requests/:request_id/cancel',
+  validateRequestId,
+  cancelLeaveRequest
+);
+
+// ===== Error Handling =====
 router.use((err, req, res, next) => {
-  console.error('請假路由錯誤:', err);
+  console.error('Leave route error:', err);
   
   if (err.code === '23505') {
     return res.status(400).json({
       success: false,
-      message: '重複的申請'
+      message: 'Duplicate request'
     });
   }
   
   res.status(500).json({
     success: false,
-    message: '服務器內部錯誤',
+    message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-// 404處理
+// 404 handler
 router.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `路由不存在: ${req.method} ${req.originalUrl}`
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    available_routes: [
+      'GET /test',
+      'GET /quotas',
+      'GET /quotas/:staff_id',
+      'GET /requests',
+      'GET /requests/pending',
+      'GET /requests/staff/:staff_id',
+      'POST /requests',
+      'PUT /requests/:request_id/approve',
+      'PUT /requests/:request_id/reject',
+      'PUT /requests/:request_id/cancel'
+    ]
   });
 });
 

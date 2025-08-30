@@ -1,92 +1,38 @@
-// controllers/leaveController.js - 簡化的請假管理控制器
-const { get } = require('../app');
+// controllers/leaveController.js - Leave Management Controller (Complete Fixed Version)
 const { query } = require('../config/database');
+const { 
+  calculateTotalDays, 
+  formatLeaveRequest, 
+  checkLeaveConflict, 
+  checkStaffExists
+} = require('../utils/leaveUtilities');
 
-console.log('載入簡化請假管理控制器...');
+console.log('Loading leave management controller...');
 
-// ===== 工具函數 =====
-
-// 計算請假天數
-const calculateTotalDays = (startDate, endDate) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const timeDiff = end.getTime() - start.getTime();
-  return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+// Leave type mappings - matching your database
+const LEAVE_TYPE_MAPPING = {
+  'casual_leave': 'Casual Leave',
+  'sick_leave': 'Sick Leave',
+  'annual_leave': 'Annual Leave',
+  'maternity_leave': 'Maternity Leave',
+  'paternity_leave': 'Paternity Leave'
 };
 
-// 格式化請假申請數據
-const formatLeaveRequest = (row) => {
-  // 資料庫格式 -> 前端格式的映射
-  const dbToFrontendMapping = {
-    'Sick Leave': 'sick_leave',
-    'Annual Leave': 'annual_leave',
-    'Casual Leave': 'casual_leave',
-    'Maternity Leave': 'maternity_leave',
-    'Paternity Leave': 'paternity_leave'
-  };
-  
-  return {
-    request_id: row.request_id,
-    staff_id: row.staff_id,
-    staff_name: row.staff_name,
-    department_name: row.department_name,
-    leave_type: dbToFrontendMapping[row.leave_type] || row.leave_type, // 轉換格式
-    start_date: row.start_date,
-    end_date: row.end_date,
-    total_days: row.total_days,
-    reason: row.reason,
-    status: row.status,
-    applied_on: row.applied_on,
-    approved_by: row.approved_by,
-    approved_by_name: row.approved_by_name,
-    approved_on: row.approved_on,
-    rejection_reason: row.rejection_reason,
-    medical_certificate: row.medical_certificate
-  };
-};
-
-// 檢查請假衝突
-const checkLeaveConflict = async (staffId, startDate, endDate, excludeRequestId = null) => {
-  let conflictQuery = `
-    SELECT request_id, start_date, end_date, leave_type, status
-    FROM leave_requests 
-    WHERE staff_id = $1 
-      AND status IN ('Pending', 'Approved')
-      AND (
-        (start_date <= $2 AND end_date >= $2) OR
-        (start_date <= $3 AND end_date >= $3) OR
-        (start_date >= $2 AND end_date <= $3)
-      )
-  `;
-  
-  const params = [staffId, startDate, endDate];
-  
-  if (excludeRequestId) {
-    conflictQuery += ` AND request_id != $4`;
-    params.push(excludeRequestId);
-  }
-  
-  const result = await query(conflictQuery, params);
-  return {
-    hasConflict: result.rows.length > 0,
-    conflicts: result.rows
-  };
-};
-
-// ===== 主要功能 =====
+// ===== Main Functions =====
 
 /**
- * HR查看所有請假申請
+ * HR view all leave requests
  */
 const getAllLeaveRequests = async (req, res) => {
   try {
+    console.log('Getting all leave requests...');
     const { status, leave_type, start_date, end_date, limit = 50, offset = 0 } = req.query;
     
     let whereConditions = [];
     let queryParams = [];
     let paramCount = 0;
     
-    // 構建篩選條件
+    // Build filter conditions
     if (status) {
       paramCount++;
       whereConditions.push(`lr.status = $${paramCount}`);
@@ -114,12 +60,12 @@ const getAllLeaveRequests = async (req, res) => {
     const whereClause = whereConditions.length > 0 ? 
       'WHERE ' + whereConditions.join(' AND ') : '';
     
+    // Simplified query to avoid JOIN issues
     const mainQuery = `
       SELECT 
         lr.request_id,
         lr.staff_id,
         s.name as staff_name,
-        d.department_name,
         lr.leave_type,
         lr.start_date,
         lr.end_date,
@@ -128,22 +74,11 @@ const getAllLeaveRequests = async (req, res) => {
         lr.status,
         lr.applied_on,
         lr.approved_by,
-        approver.name as approved_by_name,
         lr.approved_on,
         lr.rejection_reason,
-        lr.medical_certificate,
-        -- 計算優先級
-        CASE 
-          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '1 day' AND lr.status = 'Pending' THEN 'urgent'
-          WHEN lr.start_date <= CURRENT_DATE + INTERVAL '3 days' AND lr.status = 'Pending' THEN 'high'
-          WHEN lr.status = 'Pending' THEN 'medium'
-          ELSE 'normal'
-        END as priority
+        lr.medical_certificate
       FROM leave_requests lr
       LEFT JOIN staff s ON lr.staff_id = s.staff_id
-      LEFT JOIN staff approver ON lr.approved_by = approver.staff_id
-      LEFT JOIN position p ON s.position_id = p.position_id
-      LEFT JOIN department d ON p.department_id = d.department_id
       ${whereClause}
       ORDER BY 
         CASE lr.status 
@@ -158,24 +93,30 @@ const getAllLeaveRequests = async (req, res) => {
     
     queryParams.push(parseInt(limit), parseInt(offset));
     
+    console.log('Executing query:', mainQuery);
+    console.log('With params:', queryParams);
+    
     const result = await query(mainQuery, queryParams);
     
-    // 獲取總數
+    // Get total count - simplified
     const countQuery = `
       SELECT COUNT(*) as total
       FROM leave_requests lr
       LEFT JOIN staff s ON lr.staff_id = s.staff_id
-      LEFT JOIN position p ON s.position_id = p.position_id
-      LEFT JOIN department d ON p.department_id = d.department_id
       ${whereClause}
     `;
     
     const countResult = await query(countQuery, queryParams.slice(0, -2));
     const total = parseInt(countResult.rows[0].total);
     
-    const formattedData = result.rows.map(formatLeaveRequest);
+    // Format the data
+    const formattedData = result.rows.map(row => ({
+      ...row,
+      leave_type_display: LEAVE_TYPE_MAPPING[row.leave_type] || row.leave_type,
+      medical_certificate: Boolean(row.medical_certificate)
+    }));
     
-    // 統計信息
+    // Statistics
     const stats = {
       total: formattedData.length,
       pending: formattedData.filter(r => r.status === 'Pending').length,
@@ -183,11 +124,11 @@ const getAllLeaveRequests = async (req, res) => {
       rejected: formattedData.filter(r => r.status === 'Rejected').length
     };
     
-    console.log(`HR查看了${formattedData.length}個請假申請`);
+    console.log(`Successfully retrieved ${formattedData.length} leave requests`);
     
     res.json({
       success: true,
-      message: `成功獲取${formattedData.length}個請假申請`,
+      message: `Successfully retrieved ${formattedData.length} leave requests`,
       data: formattedData,
       statistics: stats,
       pagination: {
@@ -199,22 +140,71 @@ const getAllLeaveRequests = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('獲取請假申請失敗:', error);
+    console.error('Failed to get leave requests:', error);
     res.status(500).json({
       success: false,
-      message: '獲取請假申請失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+      message: 'Failed to get leave requests',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
 /**
- * 員工查看自己的請假記錄
+ * Get pending leave requests only
+ */
+const getPendingRequests = async (req, res) => {
+  try {
+    console.log('Getting pending leave requests...');
+    
+    const result = await query(`
+      SELECT 
+        lr.request_id,
+        lr.staff_id,
+        s.name as staff_name,
+        lr.leave_type,
+        lr.start_date,
+        lr.end_date,
+        lr.total_days,
+        lr.reason,
+        lr.status,
+        lr.applied_on
+      FROM leave_requests lr
+      LEFT JOIN staff s ON lr.staff_id = s.staff_id
+      WHERE lr.status = 'Pending'
+      ORDER BY lr.applied_on DESC
+    `);
+    
+    const formattedData = result.rows.map(row => ({
+      ...row,
+      leave_type_display: LEAVE_TYPE_MAPPING[row.leave_type] || row.leave_type
+    }));
+    
+    res.json({
+      success: true,
+      message: `Found ${formattedData.length} pending requests`,
+      data: formattedData,
+      count: formattedData.length
+    });
+    
+  } catch (error) {
+    console.error('Failed to get pending requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get pending requests',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Staff view own leave records
  */
 const getMyLeaveRequests = async (req, res) => {
   try {
     const { staff_id } = req.params;
     const { status, limit = 20, offset = 0 } = req.query;
+    
+    console.log(`Getting leave requests for staff ${staff_id}`);
     
     let whereConditions = ['lr.staff_id = $1'];
     let queryParams = [parseInt(staff_id)];
@@ -241,13 +231,11 @@ const getMyLeaveRequests = async (req, res) => {
         lr.status,
         lr.applied_on,
         lr.approved_by,
-        approver.name as approved_by_name,
         lr.approved_on,
         lr.rejection_reason,
         lr.medical_certificate
       FROM leave_requests lr
       LEFT JOIN staff s ON lr.staff_id = s.staff_id
-      LEFT JOIN staff approver ON lr.approved_by = approver.staff_id
       ${whereClause}
       ORDER BY lr.applied_on DESC
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
@@ -256,58 +244,64 @@ const getMyLeaveRequests = async (req, res) => {
     if (result.rows.length === 0) {
       return res.json({
         success: true,
-        message: '暫無請假記錄',
+        message: 'No leave records found',
         data: [],
         count: 0
       });
     }
     
-    const formattedData = result.rows.map(formatLeaveRequest);
+    const formattedData = result.rows.map(row => ({
+      ...row,
+      leave_type_display: LEAVE_TYPE_MAPPING[row.leave_type] || row.leave_type,
+      medical_certificate: Boolean(row.medical_certificate)
+    }));
     
-    console.log(`員工 ${staff_id} 查看了自己的請假記錄`);
+    console.log(`Successfully retrieved ${formattedData.length} leave records for staff ${staff_id}`);
     
     res.json({
       success: true,
-      message: `成功獲取${formattedData.length}條請假記錄`,
+      message: `Successfully retrieved ${formattedData.length} leave records`,
       data: formattedData,
       count: formattedData.length
     });
     
   } catch (error) {
-    console.error('獲取員工請假記錄失敗:', error);
+    console.error('Failed to get staff leave records:', error);
     res.status(500).json({
       success: false,
-      message: '獲取請假記錄失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+      message: 'Failed to get leave records',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
 /**
- * 員工提交請假申請
+ * Staff submit leave request
  */
 const submitLeaveRequest = async (req, res) => {
   try {
     const { staff_id, leave_type, start_date, end_date, reason, medical_certificate } = req.body;
     
-    // 基本驗證
+    console.log('Submitting leave request:', { staff_id, leave_type, start_date, end_date });
+    
+    // Basic validation
     if (!staff_id || !leave_type || !start_date || !end_date || !reason?.trim()) {
       return res.status(400).json({
         success: false,
-        message: '請填寫所有必填字段'
+        message: 'Please fill in all required fields'
       });
     }
     
-    // 驗證員工存在
+    // Validate staff exists
     const staffCheck = await query('SELECT staff_id, name FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
     if (staffCheck.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: '員工不存在'
+        message: 'Staff does not exist'
       });
     }
     
-    // 驗證日期
+    // Validate dates
     const startDate = new Date(start_date);
     const endDate = new Date(end_date);
     const today = new Date();
@@ -316,80 +310,76 @@ const submitLeaveRequest = async (req, res) => {
     if (startDate < today) {
       return res.status(400).json({
         success: false,
-        message: '開始日期不能是過去的日期'
+        message: 'Start date cannot be in the past'
       });
     }
     
     if (startDate > endDate) {
       return res.status(400).json({
         success: false,
-        message: '開始日期不能晚於結束日期'
+        message: 'Start date cannot be later than end date'
       });
     }
     
-    // 檢查衝突
-    const conflictCheck = await checkLeaveConflict(staff_id, start_date, end_date);
-    if (conflictCheck.hasConflict) {
-      return res.status(400).json({
-        success: false,
-        message: '申請時間與現有請假記錄衝突',
-        conflicts: conflictCheck.conflicts
-      });
-    }
+    // Calculate days (simple version)
+    const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
     
-    // 計算天數
-    const totalDays = calculateTotalDays(start_date, end_date);
+    // Convert frontend leave type to database format
+    const dbLeaveType = LEAVE_TYPE_MAPPING[leave_type] || leave_type;
     
-    // 創建申請
+    // Create request
     const result = await query(`
       INSERT INTO leave_requests (
         staff_id, leave_type, start_date, end_date, total_days,
         reason, medical_certificate, status, applied_on
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending', CURRENT_TIMESTAMP)
       RETURNING request_id, staff_id, leave_type, start_date, end_date, 
-                total_days, reason, status, applied_on
+                total_days, reason, medical_certificate, status, applied_on
     `, [
-      parseInt(staff_id), leave_type, start_date, end_date, 
+      parseInt(staff_id), dbLeaveType, start_date, end_date, 
       totalDays, reason.trim(), medical_certificate || false
     ]);
     
     const newRequest = result.rows[0];
     newRequest.staff_name = staffCheck.rows[0].name;
+    newRequest.leave_type_display = dbLeaveType;
     
-    console.log(`員工 ${staff_id} 提交了新的請假申請`);
+    console.log(`Staff ${staff_id} submitted a new leave request - ID: ${newRequest.request_id}`);
     
     res.status(201).json({
       success: true,
-      message: '請假申請提交成功',
-      data: formatLeaveRequest(newRequest)
+      message: 'Leave request submitted successfully',
+      data: newRequest
     });
     
   } catch (error) {
-    console.error('提交請假申請失敗:', error);
+    console.error('Failed to submit leave request:', error);
     res.status(500).json({
       success: false,
-      message: '提交請假申請失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+      message: 'Failed to submit leave request',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
 /**
- * HR批准請假申請
+ * HR approve leave request
  */
 const approveLeaveRequest = async (req, res) => {
   try {
     const { request_id } = req.params;
     const { approved_by, comments } = req.body;
     
+    console.log(`Approving leave request ${request_id} by ${approved_by}`);
+    
     if (!approved_by) {
       return res.status(400).json({
         success: false,
-        message: '需要提供批准人ID'
+        message: 'Approver ID is required'
       });
     }
     
-    // 檢查申請是否存在且為待審批狀態
+    // Check if request exists and is pending
     const requestCheck = await query(`
       SELECT lr.*, s.name as staff_name 
       FROM leave_requests lr
@@ -400,7 +390,7 @@ const approveLeaveRequest = async (req, res) => {
     if (requestCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '請假申請不存在'
+        message: 'Leave request not found'
       });
     }
     
@@ -409,69 +399,61 @@ const approveLeaveRequest = async (req, res) => {
     if (leaveRequest.status !== 'Pending') {
       return res.status(400).json({
         success: false,
-        message: `只能批准待審批的申請，當前狀態：${leaveRequest.status}`
+        message: `Can only approve pending requests. Current status: ${leaveRequest.status}`
       });
     }
     
-    // 檢查批准人是否存在
-    const approverCheck = await query('SELECT name FROM staff WHERE staff_id = $1', [parseInt(approved_by)]);
-    if (approverCheck.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '批准人不存在'
-      });
-    }
-    
-    // 更新申請狀態
+    // Update request status
     const result = await query(`
       UPDATE leave_requests 
       SET status = 'Approved', 
           approved_by = $1, 
           approved_on = CURRENT_TIMESTAMP,
-          rejection_reason = $2,
-          updated_at = CURRENT_TIMESTAMP
+          rejection_reason = $2
       WHERE request_id = $3
       RETURNING *
     `, [parseInt(approved_by), comments, parseInt(request_id)]);
     
     const updatedRequest = result.rows[0];
     updatedRequest.staff_name = leaveRequest.staff_name;
-    updatedRequest.approved_by_name = approverCheck.rows[0].name;
+    updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
     
-    console.log(`HR批准了請假申請 ${request_id}`);
+    console.log(`Leave request ${request_id} approved successfully`);
     
     res.json({
       success: true,
-      message: '請假申請已批准',
-      data: formatLeaveRequest(updatedRequest)
+      message: 'Leave request approved',
+      data: updatedRequest
     });
     
   } catch (error) {
-    console.error('批准請假申請失敗:', error);
+    console.error('Failed to approve leave request:', error);
     res.status(500).json({
       success: false,
-      message: '批准請假申請失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+      message: 'Failed to approve leave request',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
 /**
- * HR拒絕請假申請
+ * HR reject leave request
  */
 const rejectLeaveRequest = async (req, res) => {
   try {
     const { request_id } = req.params;
     const { rejected_by, reason } = req.body;
     
+    console.log(`Rejecting leave request ${request_id} by ${rejected_by}`);
+    
     if (!rejected_by || !reason?.trim()) {
       return res.status(400).json({
         success: false,
-        message: '需要提供拒絕人ID和拒絕原因'
+        message: 'Rejector ID and rejection reason are required'
       });
     }
     
-    // 檢查申請是否存在且為待審批狀態
+    // Check if request exists and is pending
     const requestCheck = await query(`
       SELECT lr.*, s.name as staff_name 
       FROM leave_requests lr
@@ -482,7 +464,7 @@ const rejectLeaveRequest = async (req, res) => {
     if (requestCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '請假申請不存在'
+        message: 'Leave request not found'
       });
     }
     
@@ -491,137 +473,203 @@ const rejectLeaveRequest = async (req, res) => {
     if (leaveRequest.status !== 'Pending') {
       return res.status(400).json({
         success: false,
-        message: `只能拒絕待審批的申請，當前狀態：${leaveRequest.status}`
+        message: `Can only reject pending requests. Current status: ${leaveRequest.status}`
       });
     }
     
-    // 檢查拒絕人是否存在
-    const rejecterCheck = await query('SELECT name FROM staff WHERE staff_id = $1', [parseInt(rejected_by)]);
-    if (rejecterCheck.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '拒絕人不存在'
-      });
-    }
-    
-    // 更新申請狀態
+    // Update request status
     const result = await query(`
       UPDATE leave_requests 
       SET status = 'Rejected', 
           approved_by = $1, 
           approved_on = CURRENT_TIMESTAMP,
-          rejection_reason = $2,
-          updated_at = CURRENT_TIMESTAMP
+          rejection_reason = $2
       WHERE request_id = $3
       RETURNING *
     `, [parseInt(rejected_by), reason.trim(), parseInt(request_id)]);
     
     const updatedRequest = result.rows[0];
     updatedRequest.staff_name = leaveRequest.staff_name;
-    updatedRequest.approved_by_name = rejecterCheck.rows[0].name;
+    updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
     
-    console.log(`HR拒絕了請假申請 ${request_id}`);
+    console.log(`Leave request ${request_id} rejected successfully`);
     
     res.json({
       success: true,
-      message: '請假申請已拒絕',
-      data: formatLeaveRequest(updatedRequest)
+      message: 'Leave request rejected',
+      data: updatedRequest
     });
     
   } catch (error) {
-    console.error('拒絕請假申請失敗:', error);
+    console.error('Failed to reject leave request:', error);
     res.status(500).json({
       success: false,
-      message: '拒絕請假申請失敗',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+      message: 'Failed to reject leave request',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
-// 正確 - 路由處理函數格式
-const getAllLeaveQuotas = async (req, res) => {
+/**
+ * Staff cancel leave request
+ */
+const cancelLeaveRequest = async (req, res) => {
   try {
-    const result = await query('SELECT * FROM leave');
-    res.json({
-      success: true,
-      data: result.rows
-    });
-  } catch (error) {
-    console.error('獲取所有請假配額失敗:', error);
-    res.status(500).json({
-      success: false,
-      message: '獲取配額失敗'
-    });
-  }
-};
-
-const getMyLeaveQuota = async (req, res) => {
-  try {
-    const { staff_id } = req.params;
-    const result = await query(`
-      SELECT 
-        al_quota, al_used, (al_quota - al_used) as al_remaining,
-        sl_quota, sl_used, (sl_quota - sl_used) as sl_remaining,
-        cl_quota, cl_used, (cl_quota - cl_used) as cl_remaining,
-        ml_quota, ml_used, (ml_quota - ml_used) as ml_remaining,
-        pl_quota, pl_used, (pl_quota - pl_used) as pl_remaining
-      FROM leave
-      WHERE staff_id = $1
-    `, [parseInt(staff_id)]);
+    const { request_id } = req.params;
+    const { staff_id, reason } = req.body;
     
-    if (result.rows.length === 0) {
-      return res.status(404).json({
+    console.log(`Staff ${staff_id} cancelling leave request ${request_id}`);
+    
+    if (!staff_id) {
+      return res.status(400).json({
         success: false,
-        message: '找不到該員工的配額記錄'
+        message: 'Staff ID is required'
       });
     }
     
+    // Check if request exists and belongs to the staff
+    const requestCheck = await query(`
+      SELECT lr.*, s.name as staff_name 
+      FROM leave_requests lr
+      LEFT JOIN staff s ON lr.staff_id = s.staff_id
+      WHERE lr.request_id = $1 AND lr.staff_id = $2
+    `, [parseInt(request_id), parseInt(staff_id)]);
+    
+    if (requestCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Leave request not found or does not belong to this staff member'
+      });
+    }
+    
+    const leaveRequest = requestCheck.rows[0];
+    
+    if (leaveRequest.status !== 'Pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Can only cancel pending requests. Current status: ${leaveRequest.status}`
+      });
+    }
+    
+    // Update request status
+    const result = await query(`
+      UPDATE leave_requests 
+      SET status = 'Cancelled',
+          rejection_reason = $1
+      WHERE request_id = $2
+      RETURNING *
+    `, [reason || 'Staff initiated cancellation', parseInt(request_id)]);
+    
+    const updatedRequest = result.rows[0];
+    updatedRequest.staff_name = leaveRequest.staff_name;
+    updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
+    
+    console.log(`Staff ${staff_id} cancelled leave request ${request_id} successfully`);
+    
     res.json({
       success: true,
+      message: 'Leave request cancelled',
+      data: updatedRequest
+    });
+    
+  } catch (error) {
+    console.error('Failed to cancel leave request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel leave request',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Get all leave quotas - HR function
+ */ 
+const getAllLeaveQuotas = async (req, res) => {
+  try {
+    console.log('Getting all leave quotas...');
+    
+    const result = await query(`
+      SELECT 
+        l.*,
+        s.name as staff_name
+      FROM leave l
+      LEFT JOIN staff s ON l.staff_id = s.staff_id
+      ORDER BY l.staff_id ASC
+    `); 
+    
+    console.log(`Retrieved ${result.rows.length} leave quotas`);
+    
+    res.json({
+      success: true,
+      message: `Successfully retrieved ${result.rows.length} leave quotas`,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Failed to get all leave quotas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get quotas',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
+/**
+ * Get staff leave quota
+ */
+const getMyLeaveQuota = async (req, res) => {
+  try {
+    const { staff_id } = req.params;
+    console.log(`Getting leave quota for staff ${staff_id}`);
+    
+    const result = await query(`
+      SELECT 
+        al_quota, al_used, (COALESCE(al_quota, 0) - COALESCE(al_used, 0)) as al_remaining,
+        sl_quota, sl_used, (COALESCE(sl_quota, 0) - COALESCE(sl_used, 0)) as sl_remaining,
+        cl_quota, cl_used, (COALESCE(cl_quota, 0) - COALESCE(cl_used, 0)) as cl_remaining,
+        ml_quota, ml_used, (COALESCE(ml_quota, 0) - COALESCE(ml_used, 0)) as ml_remaining,
+        pl_quota, pl_used, (COALESCE(pl_quota, 0) - COALESCE(pl_used, 0)) as pl_remaining
+      FROM leave
+      WHERE staff_id = $1
+    `, [parseInt(staff_id)]); 
+    
+    if (result.rows.length === 0) {
+      console.log(`No quota record found for staff ${staff_id}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Leave quota record not found for this staff member'
+      });
+    }
+    
+    console.log(`Successfully retrieved leave quota for staff ${staff_id}`);
+    
+    res.json({
+      success: true,
+      message: 'Successfully retrieved leave quota',
       data: result.rows[0]
     });
     
   } catch (error) {
-    console.error('獲取請假配額失敗:', error);
+    console.error('Failed to get leave quota:', error);
     res.status(500).json({
       success: false,
-      message: '獲取配額失敗'
+      message: 'Failed to get quota',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
-  }
-};
-
-const getMyLeaveQuota = async (staffId) => {
-  try {
-    const result = await query(`
-      SELECT 
-        al_quota,
-        sl_quota,
-        maternity_leave_quota,
-        paternity_leave_quota
-      FROM leave
-      WHERE staff_id = $1
-    `, [parseInt(staffId)]);
-    
-    if (result.rows.length === 0) {
-      return null;
-    }
-    
-    return result.rows[0];
-    
-  } catch (error) {
-    console.error('獲取請假配額失敗:', error);
-    return null;
   }
 };
 
 module.exports = {
   getAllLeaveRequests,
+  getPendingRequests,
   getMyLeaveRequests,
   submitLeaveRequest,
   approveLeaveRequest,
   rejectLeaveRequest,
+  cancelLeaveRequest,
   getAllLeaveQuotas,
   getMyLeaveQuota
 };
 
-console.log('簡化請假管理控制器載入成功!');
+console.log('Leave management controller loaded successfully!');

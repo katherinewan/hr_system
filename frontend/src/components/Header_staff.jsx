@@ -19,7 +19,6 @@ import {
   Calendar, 
   FileHeart, 
   CircleDollarSign, 
-  Settings, 
   LogOut, 
   Home,
   History
@@ -132,7 +131,6 @@ export default function ButtonAppBar() {
     { text: 'Attendance', icon: <Calendar />, path: '/staff/staff-attendance'}, 
     { text: 'Leave Management', icon: <FileHeart />, path: '/staff/leave-management'}, 
     { text: 'Payslip', icon: <CircleDollarSign />, path: '/staff/payslip'}, 
-    { text: 'Settings', icon: <Settings />, path: '/staff/settings', category: 'system' },
     { text: 'Sign Out', icon: <LogOut />, path: '/logout', category: 'auth', isLogout: true }
   ];
   

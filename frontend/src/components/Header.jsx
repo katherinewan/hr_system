@@ -19,7 +19,6 @@ import {
   Calendar, 
   FileHeart, 
   CircleDollarSign, 
-  Settings, 
   LogOut, 
   Building2, 
   Landmark, 
@@ -133,7 +132,6 @@ export default function ButtonAppBar() {
     { text: 'Payroll', icon: <Landmark />, path: '/hr/payroll', category: 'payroll' },
     { text: 'Position', icon: <Smile />, path: '/hr/position', category: 'org' },
     { text: 'Department', icon: <Building2 />, path: '/hr/department', category: 'org' },
-    { text: 'Settings', icon: <Settings />, path: '/hr/settings', category: 'system' },
     { text: 'Sign Out', icon: <LogOut />, path: '/login', category: 'auth', isLogout: true }
   ];
 
@@ -349,7 +347,7 @@ export default function ButtonAppBar() {
                 <History size={14} className="history-icon" />
                 <Box className="last-login-content">
                   <Typography variant="caption" className="last-login-label">
-                    上次登入
+                    Last Login
                   </Typography>
                   <Typography variant="caption" className="last-login-time">
                     {formatLastLogin(lastLoginTime)}

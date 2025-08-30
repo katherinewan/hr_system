@@ -1,11 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  UserCheck, 
-  Clock, 
-  TrendingUp
-} from 'lucide-react';
 import Header_staff from '../../components/Header_staff.jsx';
 import StaffDashboard from './StaffDashboard.jsx';
 import StaffProfile from './StaffProfile.jsx';
@@ -119,7 +113,6 @@ export default function Homepage() {
   console.log('✅ HR Homepage component loaded');
   
   return (
-    // 移除 <Router> 標籤
     <Layout>
       <Routes>
         <Route path="/" element={<StaffDashboard />} />
@@ -129,7 +122,6 @@ export default function Homepage() {
         <Route path="/staff-attendance" element={<Attendance />} />
         <Route path="/leave-management" element={<Leave />} />
         <Route path="/payslip" element={<Payslip />} />
-        <Route path="/settings" element={<ComingSoon title="System Settings" />} />
         <Route path="*" element={<StaffDashboard />} />
       </Routes>
     </Layout>

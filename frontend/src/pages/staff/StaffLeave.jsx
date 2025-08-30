@@ -26,35 +26,62 @@ const StaffLeave = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
 
-  useEffect(() => {
-    fetchLeaveData();
-  }, []);
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch('/api/auth/me');
+      const data = await response.json();
+      if (data.success) {
+        setCurrentUser({ staff_id: data.user.staff_id });
+      }
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+      // 測試時使用默認值
+      setCurrentUser({ staff_id: 100001 });
+    }
+  };
 
   const fetchLeaveData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // 使用正確的員工專用端點
-      const response = await fetch(`/api/holidays/requests/staff/${currentUser.staff_id}`);
+      // 修改API端點：從 /api/holidays/requests/staff/:staff_id 改為 /api/leave/requests/staff/:staff_id
+      const response = await fetch(`/api/leave/requests/staff/${currentUser.staff_id}`);
       
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           setLeaveRequests(data.data || []);
         } else {
-          setError(data.message || '獲取請假記錄失敗');
+          setError(data.message || 'Failed to retrieve leave records');
         }
       } else {
-        throw new Error(`HTTP錯誤: ${response.status}`);
+        throw new Error(`HTTP Error: ${response.status}`);
       }
 
     } catch (err) {
-      setError('無法載入請假數據');
+      setError('Unable to load leave data');
       console.error('Error fetching leave data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLeaveQuota = async () => {
+    try {
+      // 修改API端點：從 /api/holidays/quotas/:staff_id 改為 /api/leave/quotas/:staff_id
+      const response = await fetch(`/api/leave/quotas/${currentUser.staff_id}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setLeaveQuota(data.data);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching leave quota:', err);
     }
   };
 
@@ -86,7 +113,8 @@ const StaffLeave = () => {
       setFormError('');
 
       try {
-        const response = await fetch('/api/holidays/requests', {
+        // 修改API端點：從 /api/holidays/requests 改為 /api/leave/requests
+        const response = await fetch('/api/leave/requests', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -445,7 +473,8 @@ const StaffLeave = () => {
   // Cancel request function
   const handleCancelRequest = async (requestId) => {
     try {
-      const response = await fetch(`/api/holidays/requests/${requestId}/cancel`, {
+      // 修改API端點：從 /api/holidays/requests/:request_id/cancel 改為 /api/leave/requests/:request_id/cancel
+      const response = await fetch(`/api/leave/requests/${requestId}/cancel`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -456,12 +485,18 @@ const StaffLeave = () => {
         })
       });
 
-      if (response.ok) {
+      const result = await response.json();
+      
+      if (result.success) {
         setSelectedRequest(null);
         fetchLeaveData(); // Refresh data
+      } else {
+        console.error('Error cancelling request:', result.message);
+        alert(result.message || 'Failed to cancel request');
       }
     } catch (err) {
       console.error('Error cancelling request:', err);
+      alert('Network error, please try again');
     }
   };
 

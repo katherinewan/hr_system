@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, RefreshCw, Eye, AlertCircle, Loader, 
+  Search, RefreshCw, Eye, AlertCircle, Loader, History,
   Trash2, FileText, User, Building
 } from 'lucide-react';
 

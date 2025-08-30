@@ -1,51 +1,51 @@
-// middleware/leaveMiddleware.js - 簡化的請假管理中間件
+// middleware/leaveMiddleware.js - Leave Management Middleware
 const { validateLeaveRequest, checkStaffExists } = require('../utils/leaveUtilities');
 
-console.log('載入簡化請假管理中間件...');
+console.log('Loading leave management middleware...');
 
 /**
- * 驗證請假申請數據
+ * Validate leave request data
  */
 const validateLeaveRequestData = async (req, res, next) => {
   try {
     const requestData = req.body;
     
-    // 基本數據驗證
+    // Basic data validation
     const validation = validateLeaveRequest(requestData);
     if (!validation.isValid) {
       return res.status(400).json({
         success: false,
-        message: '數據驗證失敗',
+        message: 'Data validation failed',
         errors: validation.errors
       });
     }
     
-    // 檢查員工是否存在
+    // Check if staff exists
     if (requestData.staff_id) {
       const staffCheck = await checkStaffExists(requestData.staff_id);
       if (!staffCheck.exists) {
         return res.status(400).json({
           success: false,
-          message: `員工ID ${requestData.staff_id} 不存在`
+          message: `Staff ID ${requestData.staff_id} does not exist`
         });
       }
-      // 將員工信息添加到請求中
+      // Add staff info to request
       req.staffInfo = staffCheck.staff;
     }
     
     next();
   } catch (error) {
-    console.error('請假數據驗證錯誤:', error);
+    console.error('Leave data validation error:', error);
     res.status(500).json({
       success: false,
-      message: '數據驗證過程中發生錯誤',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+      message: 'Error occurred during data validation',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
 /**
- * 驗證批准權限
+ * Validate approval permissions
  */
 const validateApprovalPermission = async (req, res, next) => {
   try {
@@ -56,35 +56,35 @@ const validateApprovalPermission = async (req, res, next) => {
     if (!approverId) {
       return res.status(400).json({
         success: false,
-        message: '需要提供審批人ID'
+        message: 'Approver ID is required'
       });
     }
     
-    // 檢查審批人是否存在
+    // Check if approver exists
     const approverCheck = await checkStaffExists(approverId);
     if (!approverCheck.exists) {
       return res.status(400).json({
         success: false,
-        message: `審批人ID ${approverId} 不存在`
+        message: `Approver ID ${approverId} does not exist`
       });
     }
     
-    // 將審批人信息添加到請求中
+    // Add approver info to request
     req.approverInfo = approverCheck.staff;
     
     next();
   } catch (error) {
-    console.error('審批權限驗證錯誤:', error);
+    console.error('Approval permission validation error:', error);
     res.status(500).json({
       success: false,
-      message: '審批權限驗證過程中發生錯誤',
-      error: process.env.NODE_ENV === 'development' ? error.message : '內部服務器錯誤'
+      message: 'Error occurred during approval permission validation',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
 
 /**
- * 請假操作日誌記錄
+ * Leave operation logging
  */
 const logLeaveOperation = (operation) => {
   return (req, res, next) => {
@@ -92,20 +92,20 @@ const logLeaveOperation = (operation) => {
     const { staff_id, request_id } = req.params;
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     
-    console.log(`[${timestamp}] ${operation} - 員工: ${staff_id || 'all'} - 申請: ${request_id || 'none'} - IP: ${clientIP}`);
+    console.log(`[${timestamp}] ${operation} - Staff: ${staff_id || 'all'} - Request: ${request_id || 'none'} - IP: ${clientIP}`);
     
-    // 記錄響應狀態
+    // Log response status
     const originalSend = res.send;
     res.send = function(data) {
       const statusCode = res.statusCode;
-      console.log(`[${timestamp}] ${operation} 完成 - 狀態碼: ${statusCode}`);
+      console.log(`[${timestamp}] ${operation} completed - Status: ${statusCode}`);
       
       if (statusCode >= 400) {
         try {
           const parsedData = JSON.parse(data);
-          console.log(`[${timestamp}] ${operation} 錯誤詳情:`, parsedData.message || '未知錯誤');
+          console.log(`[${timestamp}] ${operation} error details:`, parsedData.message || 'Unknown error');
         } catch (parseError) {
-          // 忽略解析錯誤
+          // Ignore parse errors
         }
       }
       
@@ -117,54 +117,54 @@ const logLeaveOperation = (operation) => {
 };
 
 /**
- * 統一錯誤處理
+ * Unified error handling
  */
 const handleLeaveErrors = (err, req, res, next) => {
-  console.error('請假管理錯誤:', err);
+  console.error('Leave management error:', err);
   
-  // PostgreSQL 錯誤處理
+  // PostgreSQL error handling
   if (err.code) {
     switch (err.code) {
-      case '23505': // 唯一約束違反
+      case '23505': // Unique constraint violation
         return res.status(400).json({
           success: false,
-          message: '重複的數據，請檢查輸入',
+          message: 'Duplicate data, please check input',
           error_code: 'DUPLICATE_DATA'
         });
         
-      case '23503': // 外鍵約束違反
+      case '23503': // Foreign key constraint violation
         return res.status(400).json({
           success: false,
-          message: '相關數據不存在，請檢查輸入',
+          message: 'Related data does not exist, please check input',
           error_code: 'FOREIGN_KEY_VIOLATION'
         });
         
-      case '23514': // 檢查約束違反
+      case '23514': // Check constraint violation
         return res.status(400).json({
           success: false,
-          message: '數據不符合業務規則',
+          message: 'Data does not meet business rules',
           error_code: 'CHECK_CONSTRAINT_VIOLATION'
         });
         
       default:
         return res.status(500).json({
           success: false,
-          message: '數據庫操作失敗',
+          message: 'Database operation failed',
           error_code: 'DATABASE_ERROR'
         });
     }
   }
   
-  // 其他錯誤
+  // Other errors
   res.status(500).json({
     success: false,
-    message: '請假管理系統錯誤',
-    error: process.env.NODE_ENV === 'development' ? err.message : '內部服務器錯誤'
+    message: 'Leave management system error',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
 };
 
 /**
- * Content-Type 驗證
+ * Content-Type validation
  */
 const validateContentType = (req, res, next) => {
   if (req.method === 'POST' || req.method === 'PUT') {
@@ -173,7 +173,7 @@ const validateContentType = (req, res, next) => {
     if (!contentType || !contentType.includes('application/json')) {
       return res.status(400).json({
         success: false,
-        message: 'Content-Type 必須是 application/json'
+        message: 'Content-Type must be application/json'
       });
     }
   }
@@ -189,4 +189,4 @@ module.exports = {
   validateContentType
 };
 
-console.log('簡化請假管理中間件載入成功!');
+console.log('Leave management middleware loaded successfully!');
