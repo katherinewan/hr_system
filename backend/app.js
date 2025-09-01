@@ -72,7 +72,8 @@ app.get('/api', (req, res) => {
       '/api/positions/*',
       '/api/departments/*',
       '/api/attendance/*',
-      '/api/salaries/*'
+      '/api/salaries/*',
+      '/api/payrolls/*'
     ]
   });
 });
@@ -108,7 +109,8 @@ const routeStatus = {
   positions: loadRoute('./routes/positionRoutes', '/api/positions', 'Position routes'),
   departments: loadRoute('./routes/departRoutes', '/api/departments', 'Department routes'),
   attendance: loadRoute('./routes/attendRoutes', '/api/attendance', 'Attendance routes'),
-  salaries: loadRoute('./routes/salaryRoutes', '/api/salaries', 'Salary routes')
+  salaries: loadRoute('./routes/salaryRoutes', '/api/salaries', 'Salary routes'),
+  payrolls: loadRoute('./routes/payrollRoutes', '/api/payrolls', 'Payroll routes')
 };
 
 // Create fallback routes for missing modules
@@ -148,6 +150,10 @@ if (!routeStatus.salaries) {
   createFallbackRoute('/api/salaries', 'Salary Management');
 }
 
+if (!routeStatus.payrolls) {
+  createFallbackRoute('/api/payrolls', 'Payroll Management');
+}
+
 // Update API info endpoint with actual status
 app.get('/api/status', (req, res) => {
   res.json({
@@ -162,7 +168,8 @@ app.get('/api/status', (req, res) => {
       positions: routeStatus.positions ? 'active' : 'fallback',
       departments: routeStatus.departments ? 'active' : 'fallback',
       attendance: routeStatus.attendance ? 'active' : 'fallback',
-      salaries: routeStatus.salaries ? 'active' : 'fallback'
+      salaries: routeStatus.salaries ? 'active' : 'fallback',
+      payrolls: routeStatus.payrolls ? 'active' : 'fallback'
     },
     active_endpoints: Object.keys(routeStatus).filter(key => routeStatus[key]).length,
     total_endpoints: Object.keys(routeStatus).length

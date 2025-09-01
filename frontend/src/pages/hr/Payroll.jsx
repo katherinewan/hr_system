@@ -13,8 +13,6 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
-  Clock,
-  History,
   FileText,
   Calendar,
   CheckCircle,
@@ -36,8 +34,6 @@ const PayrollManagement = () => {
   const [editingId, setEditingId] = useState(null);
   const [modalMode, setModalMode] = useState('create');
   const [showStats, setShowStats] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  
   // Statistics state
   const [stats, setStats] = useState({
     totalPayrolls: 0,
@@ -67,15 +63,6 @@ const PayrollManagement = () => {
     { value: 'earning', label: 'Earning (+)' },
     { value: 'deduction', label: 'Deduction (-)' }
   ]);
-
-  // Update time every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   // API
   const getApiUrl = () => {
@@ -410,41 +397,9 @@ const PayrollManagement = () => {
       {/* Header */}
       <div className="main-card">
         <div className="header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div>
-              <h1>Payroll Management</h1>
-              <p>Manage employee payroll records with detailed salary components</p>
-            </div>
-            <div className="header-time-display">
-              <div className="current-time-section">
-                <Clock className="time-icon" size={20} />
-                <div className="time-content">
-                  <div className="current-time">
-                    {currentTime.toLocaleTimeString('en-US', { 
-                      hour12: false,
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit'
-                    })}
-                  </div>
-                  <div className="current-date">
-                    {currentTime.toLocaleDateString('en-US', { 
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </div>
-                </div>
-              </div>
-              <div className="time-divider"></div>
-              <div className="last-login-section">
-                <History className="history-icon" size={16} />
-                <div className="last-login-content">
-                  <span className="last-login-label">System Status</span>
-                  <div className="last-login-time">Online</div>
-                </div>
-              </div>
-            </div>
+          <div>
+            <h1>Payroll Management</h1>
+            <p>Manage employee payroll records with detailed salary components</p>
           </div>
         </div>
       </div>
