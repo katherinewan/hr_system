@@ -1,5 +1,5 @@
 // HR_Homepage.jsx - Fixed Route Configuration
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
@@ -9,7 +9,9 @@ import {
   Building2, 
   DollarSign,
   ArrowRight,
-  TrendingUp
+  TrendingUp,
+  Shield,
+  Calendar
 } from 'lucide-react';
 import Header from '../../components/Header.jsx';
 import Staffinfo from './Staffinfo';
@@ -31,89 +33,154 @@ const Layout = ({ children }) => (
 
 // Main Dashboard Component
 const DashboardHome = () => {
+  const navigate = useNavigate();
   const [userInfo, setUserInfo] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Fetch logged-in user info
   useEffect(() => {
-    // Get user information
-    try {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        setUserInfo(JSON.parse(storedUserInfo));
+    const fetchUserInfo = async () => {
+      try {
+        // Get user info from localStorage or session storage
+        const storedUser = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser');
+        
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setUserInfo(userData);
+        } else {
+          // If no stored user data, try to fetch from API using auth token
+          const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+          
+          if (token) {
+            // API call to get current user info
+            const response = await fetch('/api/auth/me', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const userData = await response.json();
+              setUserInfo(userData);
+              // Store user data for future use
+              localStorage.setItem('currentUser', JSON.stringify(userData));
+            } else {
+              console.error('Failed to fetch user info:', response.statusText);
+              // Redirect to login if unauthorized
+              if (response.status === 401) {
+                window.location.href = '/login';
+              }
+            }
+          } else {
+            // No token found, redirect to login
+            console.warn('No auth token found');
+            window.location.href = '/login';
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+        // Fallback: try to get user from context or props if available
+        // You might want to handle this differently based on your auth system
       }
-    } catch (error) {
-      console.error('Error parsing user info:', error);
-    }
+    };
 
-    // Update current time every minute
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-
-    return () => clearInterval(timer);
+    fetchUserInfo();
   }, []);
 
+  // Data arrays
   const quickStats = [
-    { label: 'Active Employees', value: '156', icon: Users, color: 'blue' },
-    { label: 'Present Today', value: '142', icon: UserCheck, color: 'green' },
-    { label: 'Pending Reviews', value: '8', icon: Clock, color: 'orange' },
-    { label: 'New Hires', value: '3', icon: TrendingUp, color: 'purple' }
+    { 
+      label: 'Active Employees', 
+      value: '156', 
+      icon: Users, 
+      color: '#799496',
+      trend: '+3 this month'
+    },
+    { 
+      label: 'Present Today', 
+      value: '142', 
+      icon: UserCheck, 
+      color: '#254E70',
+      trend: '91% attendance'
+    },
+    { 
+      label: 'Pending Reviews', 
+      value: '8', 
+      icon: Clock, 
+      color: '#7a8b99',
+      trend: 'Due this week'
+    },
+    { 
+      label: 'New Hires', 
+      value: '3', 
+      icon: TrendingUp, 
+      color: '#e9eb9e',
+      trend: 'Starting Monday'
+    }
   ];
 
   const menuItems = [
     { 
       title: 'Employee Management', 
-      desc: 'View and manage employee information and records', 
+      desc: 'Comprehensive employee records, profiles, and personal information management', 
       icon: Users,
       path: '/hr/staff',
-      color: 'blue'
+      iconColor: '#799496',
+      iconBg: 'rgba(121, 148, 150, 0.1)'
     },
     { 
       title: 'User Accounts', 
-      desc: 'Manage system user accounts and permissions', 
-      icon: UserCheck,
+      desc: 'System access control, user permissions, and authentication management', 
+      icon: Shield,
       path: '/hr/user-accounts',
-      color: 'green'
+      iconColor: '#254E70',
+      iconBg: 'rgba(37, 78, 112, 0.1)'
     },
     { 
-      title: 'Attendance Tracking', 
-      desc: 'Monitor employee attendance and working hours', 
+      title: 'Attendance System', 
+      desc: 'Real-time attendance tracking, working hours monitoring and reporting', 
       icon: Clock,
       path: '/hr/attendance',
-      color: 'orange'
+      iconColor: '#7a8b99',
+      iconBg: 'rgba(122, 139, 153, 0.1)'
     },
     { 
       title: 'Leave Management', 
-      desc: 'Manage employee leave requests and approvals', 
-      icon: Clock,
+      desc: 'Streamlined leave requests, approvals, and vacation planning workflow', 
+      icon: Calendar,
       path: '/hr/leave-management',
-      color: 'red'
+      iconColor: '#799496',
+      iconBg: 'rgba(121, 148, 150, 0.1)'
     },
     { 
-      title: 'Position Management', 
-      desc: 'Configure job positions and requirements', 
+      title: 'Position Control', 
+      desc: 'Job roles definition, requirements setup and organizational structure', 
       icon: Briefcase,
       path: '/hr/position',
-      color: 'purple'
+      iconColor: '#254E70',
+      iconBg: 'rgba(37, 78, 112, 0.1)'
     },
     { 
-      title: 'Department Structure', 
-      desc: 'Organize and manage company departments', 
+      title: 'Department Hub', 
+      desc: 'Departmental organization, team management and cross-functional coordination', 
       icon: Building2,
       path: '/hr/department',
-      color: 'indigo'
+      iconColor: '#7a8b99',
+      iconBg: 'rgba(122, 139, 153, 0.1)'
     },
     { 
-      title: 'Payroll & Salary', 
-      desc: 'Handle salary calculations and payments', 
+      title: 'Payroll & Compensation', 
+      desc: 'Comprehensive salary management, payroll processing and benefits administration', 
       icon: DollarSign,
       path: '/hr/salary',
-      color: 'emerald'
+      iconColor: '#799496',
+      iconBg: 'rgba(121, 148, 150, 0.1)'
     }
   ];
 
   const handleMenuClick = (path) => {
-    window.location.href = path;
+    navigate(path);
   };
 
   return (
@@ -228,21 +295,21 @@ const DashboardHome = () => {
                 gap: '1rem'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
-                e.target.style.borderColor = '#254e70';
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 8px 15px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                e.currentTarget.style.borderColor = '#254e70';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 15px rgba(0, 0, 0, 0.1)';
               }}
               onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#f9fafb';
-                e.target.style.borderColor = '#e5e7eb';
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = 'none';
+                e.currentTarget.style.backgroundColor = '#f9fafb';
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               <div style={{
-                backgroundColor: `var(--${item.color}-50, #f0f9ff)`,
-                color: `var(--${item.color}-600, #2563eb)`,
+                backgroundColor: item.iconBg,
+                color: item.iconColor,
                 padding: '0.75rem',
                 borderRadius: '8px',
                 flexShrink: 0
@@ -286,35 +353,7 @@ const DashboardHome = () => {
         padding: '2rem',
         paddingBottom: '3rem'
       }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1rem',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>System Version:</span>
-          <span style={{ fontWeight: '600', color: '#1f2937' }}>v2.0.1</span>
-        </div>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1rem',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Last Login:</span>
-          <span style={{ fontWeight: '600', color: '#1f2937', fontSize: '0.85rem' }}>
-            {userInfo?.last_login 
-              ? new Date(userInfo.last_login).toLocaleString() 
-              : 'First time login'
-            }
-          </span>
-        </div>
+
         <div style={{
           backgroundColor: 'white',
           padding: '1rem',

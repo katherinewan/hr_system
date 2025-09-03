@@ -39,7 +39,6 @@ const HRLeaveRecords = () => {
     switch (status?.toLowerCase()) {
       case 'approved': return 'status-badge active';
       case 'rejected': return 'status-badge locked';
-      case 'pending': return 'attempts-badge normal';
       case 'cancelled': return 'badge-default';
       default: return 'badge-default';
     }
@@ -51,14 +50,18 @@ const HRLeaveRecords = () => {
       'annual_leave': 'Annual Leave',
       'casual_leave': 'Casual Leave',
       'maternity_leave': 'Maternity Leave',
-      'paternity_leave': 'Paternity Leave'
+      'paternity_leave': 'Paternity Leave',
+      'Sick Leave': 'Sick Leave',
+      'Annual Leave': 'Annual Leave',
+      'Casual Leave': 'Casual Leave',
+      'Maternity Leave': 'Maternity Leave',
+      'Paternity Leave': 'Paternity Leave'
     };
     return labels[type] || type;
   };
 
   const getStatusLabel = (status) => {
     const labels = {
-      'Pending': 'Pending',
       'Approved': 'Approved',
       'Rejected': 'Rejected',
       'Cancelled': 'Cancelled'
@@ -70,7 +73,25 @@ const HRLeaveRecords = () => {
   const loadAllRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/holidays/requests`);
+      setError('');
+      
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/holidays/requests`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.clear();
+          window.location.href = '/login';
+          return;
+        }
+        throw new Error(`HTTP Error ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
@@ -125,13 +146,10 @@ const HRLeaveRecords = () => {
                 <div className="selected-staff-info">
                   <div className="selected-staff-name">{selectedRequest.staff_name}</div>
                   <div className="selected-staff-detail">
+                    <User size={12} /> Staff ID: {selectedRequest.staff_id}
+                  </div>
+                  <div className="selected-staff-detail">
                     <Building size={12} /> {selectedRequest.department_name || 'Unassigned Department'}
-                  </div>
-                  <div className="selected-staff-detail">
-                    <User size={12} /> {selectedRequest.position_title || 'Unassigned Position'}
-                  </div>
-                  <div className="selected-staff-detail">
-                    ID: {selectedRequest.staff_id}
                   </div>
                 </div>
               </div>
@@ -250,13 +268,18 @@ const HRLeaveRecords = () => {
     loadAllRequests();
   }, []);
 
-  // Filter records - Enhanced with Staff ID search
+  // Filter records - 排除 Pending 狀態並加入搜尋功能
   const filteredRecords = allRequests.filter(request => {
+    // 排除 Pending 狀態
+    const notPending = request.status?.toLowerCase() !== 'pending';
+    
+    // 搜尋匹配
     const matchesSearch = searchInput === '' || 
-      request.staff_name.toLowerCase().includes(searchInput.toLowerCase()) ||
-      request.staff_id.toString().toLowerCase().includes(searchInput.toLowerCase()) ||
-      request.leave_type.toLowerCase().includes(searchInput.toLowerCase());
-    return matchesSearch;
+      request.staff_name?.toLowerCase().includes(searchInput.toLowerCase()) ||
+      request.staff_id?.toString().toLowerCase().includes(searchInput.toLowerCase()) ||
+      request.leave_type?.toLowerCase().includes(searchInput.toLowerCase());
+    
+    return notPending && matchesSearch;
   });
 
   return (
@@ -309,7 +332,7 @@ const HRLeaveRecords = () => {
       {/* Content */}
       <div className="content">
         <h2 className="result-title">
-          Request Records ({filteredRecords.length})
+          Processed Requests ({filteredRecords.length})
         </h2>
 
         {loading ? (
@@ -320,8 +343,8 @@ const HRLeaveRecords = () => {
         ) : filteredRecords.length === 0 ? (
           <div className="empty-state">
             <History size={64} />
-            <h3>No Request Records Found</h3>
-            <p>No request records match the search criteria</p>
+            <h3>No Processed Records Found</h3>
+            <p>No processed request records match the search criteria</p>
           </div>
         ) : (
           <div className="table-container">

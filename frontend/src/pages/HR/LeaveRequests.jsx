@@ -13,6 +13,7 @@ const HRLeaveRequests = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // API
   const getApiUrl = () => {
@@ -23,6 +24,18 @@ const HRLeaveRequests = () => {
   };
 
   const API_BASE_URL = `${getApiUrl()}/api`;
+
+  // Get current user info
+  useEffect(() => {
+    const userInfo = localStorage.getItem('userInfo');
+    if (userInfo) {
+      const user = JSON.parse(userInfo);
+      setCurrentUser(user);
+    } else {
+      // Redirect to login if no user info
+      window.location.href = '/login';
+    }
+  }, []);
 
   // Utility functions
   const showError = (message) => {
@@ -52,10 +65,15 @@ const HRLeaveRequests = () => {
   const getLeaveTypeLabel = (type) => {
     const labels = {
       'sick_leave': 'Sick Leave',
-      'annual_leave': 'Annual Leave',
+      'annual_leave': 'Annual Leave', 
       'casual_leave': 'Casual Leave',
       'maternity_leave': 'Maternity Leave',
-      'paternity_leave': 'Paternity Leave'
+      'paternity_leave': 'Paternity Leave',
+      'Sick Leave': 'Sick Leave',
+      'Annual Leave': 'Annual Leave',
+      'Casual Leave': 'Casual Leave',
+      'Maternity Leave': 'Maternity Leave',
+      'Paternity Leave': 'Paternity Leave'
     };
     return labels[type] || type;
   };
@@ -76,7 +94,13 @@ const HRLeaveRequests = () => {
       setLoading(true);
       setError('');
       
-      const response = await fetch(`${API_BASE_URL}/holidays/requests/pending`);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/holidays/requests/pending`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -86,7 +110,11 @@ const HRLeaveRequests = () => {
           body: errorText
         });
         
-        if (response.status === 404) {
+        if (response.status === 401) {
+          localStorage.clear();
+          window.location.href = '/login';
+          return;
+        } else if (response.status === 404) {
           showError('API endpoint does not exist. Please check backend server and route configuration.');
         } else if (response.status === 500) {
           showError('Internal server error. Please check backend logs.');
@@ -118,35 +146,58 @@ const HRLeaveRequests = () => {
     }
   };
 
-  // Handle request action (approve/reject)
   const handleRequestAction = async (requestId, action, comments = '') => {
+    if (!currentUser) {
+      showError('User not authenticated');
+      return;
+    }
+
     try {
       setIsProcessing(true);
+      console.log('Processing request:', { requestId, action, comments }); // Debug log
       
       const endpoint = action === 'approve' ? 'approve' : 'reject';
+      const token = localStorage.getItem('authToken');
+      
+      // 修正請求體結構
+      const requestBody = action === 'approve' ? {
+        approved_by: currentUser.staff_id,
+        comments: comments || 'Approved by HR'
+      } : {
+        rejected_by: currentUser.staff_id,
+        reason: comments || 'No reason provided'
+      };
+
+      console.log('Request body:', requestBody); // Debug log
+
       const response = await fetch(`${API_BASE_URL}/holidays/requests/${requestId}/${endpoint}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
-        body: JSON.stringify({
-          approver_id: 100002,
-          comments: comments || undefined
-        })
+        body: JSON.stringify(requestBody)
       });
 
+      console.log('Response status:', response.status); // Debug log
       const result = await response.json();
+      console.log('Response data:', result); // Debug log
       
-      if (result.success) {
-        showSuccess(`Request has been ${action === 'approve' ? 'approved' : 'rejected'}`);
+      if (response.ok && result.success) {
+        showSuccess(`Request has been ${action === 'approve' ? 'approved' : 'rejected'} successfully`);
         setShowDetailModal(false);
-        loadPendingRequests();
+        loadPendingRequests(); // 重新載入數據
       } else {
-        showError(result.message || 'Operation failed');
+        if (response.status === 401) {
+          localStorage.clear();
+          window.location.href = '/login';
+          return;
+        }
+        showError(result.message || `Failed to ${action} request`);
       }
     } catch (error) {
-      showError('Network error, please try again later');
       console.error('Error processing request:', error);
+      showError('Network error, please try again later');
     } finally {
       setIsProcessing(false);
     }
@@ -195,13 +246,13 @@ const HRLeaveRequests = () => {
                 <div className="selected-staff-info">
                   <div className="selected-staff-name">{selectedRequest.staff_name}</div>
                   <div className="selected-staff-detail">
+                    <User size={12} /> Staff ID: {selectedRequest.staff_id}
+                  </div>
+                  <div className="selected-staff-detail">
                     <Building size={12} /> {selectedRequest.department_name || 'Unassigned Department'}
                   </div>
                   <div className="selected-staff-detail">
-                    <User size={12} /> {selectedRequest.position_title || 'Unassigned Position'}
-                  </div>
-                  <div className="selected-staff-detail">
-                    <Mail size={12} /> {selectedRequest.staff_email}
+                    <Mail size={12} /> {selectedRequest.staff_email || 'No email available'}
                   </div>
                 </div>
               </div>
@@ -323,7 +374,7 @@ const HRLeaveRequests = () => {
                     </button>
                     <button
                       className="btn btn-success"
-                      onClick={() => handleRequestAction(selectedRequest.request_id, 'approve', 'Approved')}
+                      onClick={() => handleRequestAction(selectedRequest.request_id, 'approve', 'Approved by HR')}
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
@@ -378,17 +429,19 @@ const HRLeaveRequests = () => {
     );
   };
 
-  // Load data
+  // Load data when component mounts and current user is available
   useEffect(() => {
-    loadPendingRequests();
-  }, []);
+    if (currentUser) {
+      loadPendingRequests();
+    }
+  }, [currentUser]);
 
-  // Filter requests - Enhanced with Staff ID search
+  // Filter requests
   const filteredRequests = pendingRequests.filter(request => {
     const matchesSearch = searchInput === '' || 
-      request.staff_name.toLowerCase().includes(searchInput.toLowerCase()) ||
-      request.staff_id.toString().toLowerCase().includes(searchInput.toLowerCase()) ||
-      request.leave_type.toLowerCase().includes(searchInput.toLowerCase());
+      request.staff_name?.toLowerCase().includes(searchInput.toLowerCase()) ||
+      request.staff_id?.toString().toLowerCase().includes(searchInput.toLowerCase()) ||
+      request.leave_type?.toLowerCase().includes(searchInput.toLowerCase());
     return matchesSearch;
   });
 
@@ -485,24 +538,11 @@ const HRLeaveRequests = () => {
                   <tr key={request.request_id} className="table-row">
                     <td>
                       <span className="staff-id">#{request.request_id}</span>
-                      {request.days_pending > 3 && (
-                        <div style={{ 
-                          fontSize: '0.75rem', 
-                          color: '#ef4444',
-                          fontWeight: '600',
-                          marginTop: '2px'
-                        }}>
-                          Pending {request.days_pending} days
-                        </div>
-                      )}
                     </td>
                     <td>
                       <div className="employee-info">
                         <div className="employee-name">{request.staff_name}</div>
                         <div className="employee-id">ID: {request.staff_id}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                          {request.department_name || 'Unassigned Department'}
-                        </div>
                       </div>
                     </td>
                     <td>

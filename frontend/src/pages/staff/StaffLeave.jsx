@@ -4,20 +4,16 @@ import {
   Clock, 
   FileText, 
   Plus, 
-  Search, 
-  Filter,
+  Search,
   CheckCircle,
   XCircle,
   Loader,
   AlertCircle,
   User,
-  Mail,
-  Phone,
-  Building
+  Phone
 } from 'lucide-react';
 
 const StaffLeave = () => {
-  // State management
   const [leaveQuota, setLeaveQuota] = useState(null);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,12 +24,10 @@ const StaffLeave = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Initialize component
   useEffect(() => {
     initializeComponent();
   }, []);
 
-  // Fetch data when user is set
   useEffect(() => {
     if (currentUser) {
       fetchLeaveData();
@@ -45,39 +39,46 @@ const StaffLeave = () => {
     try {
       await fetchCurrentUser();
     } catch (error) {
-      console.error('Failed to initialize component:', error);
+      setError('Failed to initialize. Please log in first.');
       setLoading(false);
     }
   };
 
   const fetchCurrentUser = async () => {
     try {
-      // Try to get from localStorage first (common pattern in SPAs)
-      const storedUser = localStorage.getItem('currentUser');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
+      // Try to get from localStorage first - 配合你的登入頁面格式
+      const storedUserInfo = localStorage.getItem('userInfo');
+      const storedToken = localStorage.getItem('authToken');
+      
+      if (storedUserInfo) {
+        const user = JSON.parse(storedUserInfo);
+        // 確保使用正確的 staff_id 格式 (應該是 1001-1020 範圍)
         setCurrentUser({ staff_id: user.staff_id });
         return;
       }
 
-      // Try API call
-      const response = await fetch('/api/auth/me');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.user) {
-          setCurrentUser({ staff_id: data.user.staff_id });
-          return;
+      // Try API call with auth token if available
+      if (storedToken) {
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${storedToken}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user) {
+            setCurrentUser({ staff_id: data.user.staff_id });
+            return;
+          }
         }
       }
       
-      // Fallback for testing - use a default staff_id
-      console.log('Using fallback staff_id for testing');
-      setCurrentUser({ staff_id: 1 });
+      // No valid user found - redirect to login
+      window.location.href = '/login';
       
     } catch (error) {
-      console.error('Failed to get current user:', error);
-      // Use fallback staff_id
-      setCurrentUser({ staff_id: 1 });
+      window.location.href = '/login';
     }
   };
 
@@ -85,26 +86,31 @@ const StaffLeave = () => {
     try {
       setError(null);
       
-      // Adjust API endpoint to match your actual backend
-      const response = await fetch(`/api/holidays/requests/staff/${currentUser.staff_id}`);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/holidays/requests/staff/${currentUser.staff_id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
       
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           setLeaveRequests(data.data || []);
         } else {
-          throw new Error(data.message || 'Failed to retrieve leave records');
+          setError(data.message || 'Failed to retrieve leave records');
         }
+      } else if (response.status === 401) {
+        // Unauthorized - redirect to login
+        localStorage.clear();
+        window.location.href = '/login';
       } else {
-        // If API doesn't exist, set empty data instead of error
-        console.log('Leave requests API not available, using empty data');
-        setLeaveRequests([]);
+        setError('Unable to connect to server');
       }
 
     } catch (err) {
-      console.log('Leave data fetch failed, using empty data:', err);
-      setLeaveRequests([]);
-      // Don't set error for missing API, just use empty data
+      setError('Network error occurred');
     } finally {
       setLoading(false);
     }
@@ -112,33 +118,28 @@ const StaffLeave = () => {
 
   const fetchLeaveQuota = async () => {
     try {
-      const response = await fetch(`/api/holidays/quotas/${currentUser.staff_id}`);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/holidays/quotas/${currentUser.staff_id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
       
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           setLeaveQuota(data.data);
         }
-      } else {
-        // Set default quota if API doesn't exist
-        setLeaveQuota({
-          al_remaining: 21,
-          sl_remaining: 14,
-          cl_remaining: 7
-        });
+      } else if (response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
       }
     } catch (err) {
-      console.log('Leave quota fetch failed, using default values:', err);
-      // Set default values
-      setLeaveQuota({
-        al_remaining: 21,
-        sl_remaining: 14,
-        cl_remaining: 7
-      });
+      console.log('Failed to fetch leave quota');
     }
   };
 
-  // Filter requests based on status and search
   const filteredRequests = leaveRequests.filter(request => {
     const matchesStatus = statusFilter === 'all' || request.status.toLowerCase() === statusFilter.toLowerCase();
     const matchesSearch = searchTerm === '' || 
@@ -147,7 +148,6 @@ const StaffLeave = () => {
     return matchesStatus && matchesSearch;
   });
 
-  // Leave application form component
   const LeaveApplicationModal = () => {
     const [formData, setFormData] = useState({
       leave_type: 'casual_leave',
@@ -166,10 +166,12 @@ const StaffLeave = () => {
       setFormError('');
 
       try {
+        const token = localStorage.getItem('authToken');
         const response = await fetch('/api/holidays/requests', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
           },
           body: JSON.stringify({
             ...formData,
@@ -177,20 +179,18 @@ const StaffLeave = () => {
           })
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setShowApplyModal(false);
-            fetchLeaveData(); // Refresh data
-            return;
-          }
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          setShowApplyModal(false);
+          fetchLeaveData();
+          return;
         }
         
-        // If API call fails, show message but don't crash
-        setFormError('Leave application feature is not available yet. Please contact HR directly.');
+        setFormError(result.message || 'Failed to submit application');
         
       } catch (err) {
-        setFormError('Leave application feature is not available yet. Please contact HR directly.');
+        setFormError('Network error occurred');
       } finally {
         setSubmitting(false);
       }
@@ -209,7 +209,7 @@ const StaffLeave = () => {
                 </div>
                 <div className="user-details">
                   <h1 className="user-name">Apply for Leave</h1>
-                  <p className="user-position">Please fill in the following information to submit your leave application</p>
+                  <p className="user-position">Please fill in all required information</p>
                 </div>
               </div>
               <div className="action-buttons">
@@ -304,7 +304,7 @@ const StaffLeave = () => {
                   rows="4"
                   value={formData.reason}
                   onChange={(e) => setFormData({...formData, reason: e.target.value})}
-                  placeholder="Please provide detailed reason for leave..."
+                  placeholder="Please provide reason for leave..."
                   required
                 />
               </div>
@@ -359,7 +359,6 @@ const StaffLeave = () => {
     );
   };
 
-  // Request details modal
   const RequestDetailsModal = () => {
     if (!selectedRequest) return null;
 
@@ -492,16 +491,6 @@ const StaffLeave = () => {
               </div>
             )}
 
-            {selectedRequest.approved_by_name && (
-              <div className="info-item">
-                <User size={20} className="info-icon" />
-                <div className="info-content">
-                  <p className="info-label">Approved By</p>
-                  <p className="info-value">{selectedRequest.approved_by_name}</p>
-                </div>
-              </div>
-            )}
-
             <div className="action-buttons" style={{ marginTop: '2rem' }}>
               <button
                 className="cancel-button"
@@ -526,13 +515,14 @@ const StaffLeave = () => {
     );
   };
 
-  // Cancel request function
   const handleCancelRequest = async (requestId) => {
     try {
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`/api/holidays/requests/${requestId}/cancel`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
           staff_id: currentUser.staff_id,
@@ -544,18 +534,17 @@ const StaffLeave = () => {
         const result = await response.json();
         if (result.success) {
           setSelectedRequest(null);
-          fetchLeaveData(); // Refresh data
+          fetchLeaveData();
           return;
         }
       }
       
-      alert('Cancel feature is not available yet. Please contact HR directly.');
+      alert('Failed to cancel application');
     } catch (err) {
-      alert('Cancel feature is not available yet. Please contact HR directly.');
+      alert('Network error occurred');
     }
   };
 
-  // Helper functions
   const getLeaveTypeLabel = (type) => {
     const labels = {
       'sick_leave': 'Sick Leave',
@@ -598,6 +587,27 @@ const StaffLeave = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="staff-profile-container">
+        <div className="info-card">
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#dc2626' }}>
+            <AlertCircle size={48} style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#dc2626' }}>Error</h3>
+            <p style={{ margin: '0' }}>{error}</p>
+            <button 
+              className="edit-button" 
+              onClick={() => window.location.reload()}
+              style={{ marginTop: '1rem' }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="staff-profile-container">
       <div className="profile-card">
@@ -624,48 +634,48 @@ const StaffLeave = () => {
 
         {/* Leave Quota Dashboard */}
         {leaveQuota && (
-          <div className="profile-content" style={{ paddingBottom: 0 }}>
-            <h2 className="section-title">Leave Balance Overview</h2>
-            <div className="info-card">
-              <div className="info-grid">
-                <div className="info-item">
-                  <div className="info-icon">
-                    <Calendar size={24} color="#10b981" />
-                  </div>
-                  <div className="info-content">
-                    <p className="info-label">Annual Leave Balance</p>
-                    <p className="info-value">{leaveQuota.al_remaining || 0} days</p>
-                  </div>
+          <div className="salary-stats-dashboard">
+            <div className="stats-header">
+              <h3>Leave Balance Overview</h3>
+            </div>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon total">
+                  <Calendar size={24} />
                 </div>
-
-                <div className="info-item">
-                  <div className="info-icon">
-                    <Clock size={24} color="#3b82f6" />
-                  </div>
-                  <div className="info-content">
-                    <p className="info-label">Sick Leave Balance</p>
-                    <p className="info-value">{leaveQuota.sl_remaining || 0} days</p>
-                  </div>
+                <div className="stat-content">
+                  <div className="stat-value">{leaveQuota.al_remaining || 0}</div>
+                  <div className="stat-label">Annual Leave Balance</div>
                 </div>
+              </div>
 
-                <div className="info-item">
-                  <div className="info-icon">
-                    <FileText size={24} color="#f59e0b" />
-                  </div>
-                  <div className="info-content">
-                    <p className="info-label">Casual Leave Balance</p>
-                    <p className="info-value">{leaveQuota.cl_remaining || 0} days</p>
-                  </div>
+              <div className="stat-card">
+                <div className="stat-icon average">
+                  <Clock size={24} />
                 </div>
+                <div className="stat-content">
+                  <div className="stat-value">{leaveQuota.sl_remaining || 0}</div>
+                  <div className="stat-label">Sick Leave Balance</div>
+                </div>
+              </div>
 
-                <div className="info-item">
-                  <div className="info-icon">
-                    <User size={24} color="#8b5cf6" />
-                  </div>
-                  <div className="info-content">
-                    <p className="info-label">Pending Applications</p>
-                    <p className="info-value">{leaveRequests.filter(r => r.status === 'Pending').length}</p>
-                  </div>
+              <div className="stat-card">
+                <div className="stat-icon highest">
+                  <FileText size={24} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value">{leaveQuota.cl_remaining || 0}</div>
+                  <div className="stat-label">Casual Leave Balance</div>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon employees">
+                  <User size={24} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value">{leaveRequests.filter(r => r.status === 'Pending').length}</div>
+                  <div className="stat-label">Pending Applications</div>
                 </div>
               </div>
             </div>
@@ -673,151 +683,114 @@ const StaffLeave = () => {
         )}
 
         {/* Controls */}
-        <div className="profile-content" style={{ paddingTop: 0, paddingBottom: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
-              <Search size={20} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input
-                type="text"
-                className="edit-input"
-                style={{ paddingLeft: '2.5rem' }}
-                placeholder="Search leave type or reason..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        <div className="controls">
+          <div className="controls-wrapper">
+            <div className="search-container">
+              <div className="search-input-wrapper">
+                <Search className="search-icon" size={20} />
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="Search leave type or reason..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
 
-            <select
-              className="edit-input"
-              style={{ minWidth: '150px' }}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <div className="filter-container">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="profile-content">
-          <h2 className="section-title">
+        <div className="content">
+          <h2 className="result-title">
             My Leave Applications ({filteredRequests.length})
           </h2>
 
           {filteredRequests.length === 0 ? (
-            <div className="info-card">
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                <h3 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>No Application Records Found</h3>
-                <p style={{ margin: '0' }}>You haven't submitted any leave applications yet, or no records match your search criteria</p>
-              </div>
+            <div className="empty-state">
+              <FileText size={64} />
+              <h3>No Application Records Found</h3>
+              <p>You haven't submitted any leave applications yet, or no records match your search criteria</p>
             </div>
           ) : (
-            <div className="info-card">
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                  <thead>
-                    <tr style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)' }}>
-                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Application ID</th>
-                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leave Type</th>
-                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date Range</th>
-                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</th>
-                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Applied Date</th>
-                      <th style={{ padding: '1rem 0.75rem', textAlign: 'left', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
-                      <th style={{ padding: '1rem 0.75rem', textAlign: 'center', fontWeight: '700', color: '#374151', borderBottom: '2px solid #e5e7eb', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
+            <div className="table-container">
+              <table className="staff-table">
+                <thead className="table-header">
+                  <tr>
+                    <th>ID</th>
+                    <th>Type</th>
+                    <th>Date Range</th>
+                    <th>Days</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRequests.map((request) => (
+                    <tr key={request.request_id} className="table-row">
+                      <td>
+                        <span className="staff-id">#{request.request_id}</span>
+                      </td>
+                      <td>
+                        <span className="position-badge">
+                          {getLeaveTypeLabel(request.leave_type)}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ fontSize: '0.875rem' }}>
+                          <div>{new Date(request.start_date).toLocaleDateString()}</div>
+                          <div style={{ color: '#6b7280' }}>
+                            to {new Date(request.end_date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: '600' }}>{request.total_days} days</span>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${getStatusBadgeClass(request.status)}`}>
+                          {getStatusLabel(request.status)}
+                        </span>
+                      </td>
+                      <td className="actions-cell">
+                        <button
+                          className="action-btn edit-btn"
+                          onClick={() => setSelectedRequest(request)}
+                          title="View Details"
+                        >
+                          <FileText size={16} />
+                        </button>
+                        {request.status === 'Pending' && (
+                          <button
+                            className="action-btn cancel-btn"
+                            onClick={() => handleCancelRequest(request.request_id)}
+                            title="Cancel Application"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRequests.map((request) => (
-                      <tr key={request.request_id} style={{ transition: 'background-color 0.2s ease' }} onMouseEnter={e => e.target.closest('tr').style.backgroundColor = '#f9fafb'} onMouseLeave={e => e.target.closest('tr').style.backgroundColor = 'transparent'}>
-                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
-                          <span style={{ 
-                            fontWeight: '700', 
-                            color: '#254E70', 
-                            background: 'rgba(37, 78, 112, 0.1)', 
-                            padding: '0.25rem 0.5rem', 
-                            borderRadius: '0.375rem', 
-                            fontSize: '0.75rem' 
-                          }}>
-                            #{request.request_id}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
-                          <span style={{
-                            background: '#e9eb9e',
-                            color: '#2e382e',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.375rem',
-                            fontWeight: '600',
-                            fontSize: '0.75rem'
-                          }}>
-                            {getLeaveTypeLabel(request.leave_type)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
-                          <div style={{ fontSize: '0.875rem' }}>
-                            <div>{new Date(request.start_date).toLocaleDateString()}</div>
-                            <div style={{ color: '#6b7280' }}>
-                              to {new Date(request.end_date).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
-                          <span style={{ fontWeight: '600' }}>{request.total_days} days</span>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
-                          {new Date(request.applied_on).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' }}>
-                          <span className={`status-badge ${getStatusBadgeClass(request.status)}`}>
-                            {getStatusLabel(request.status)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                            <button
-                              className="edit-button"
-                              style={{ 
-                                padding: '0.25rem 0.5rem', 
-                                fontSize: '0.75rem',
-                                minWidth: 'auto'
-                              }}
-                              onClick={() => setSelectedRequest(request)}
-                              title="View Details"
-                            >
-                              <FileText size={14} />
-                            </button>
-                            {request.status === 'Pending' && (
-                              <button
-                                className="cancel-button"
-                                style={{ 
-                                  padding: '0.25rem 0.5rem', 
-                                  fontSize: '0.75rem',
-                                  minWidth: 'auto',
-                                  background: '#dc2626',
-                                  color: 'white'
-                                }}
-                                onClick={() => handleCancelRequest(request.request_id)}
-                                title="Cancel Application"
-                              >
-                                <XCircle size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        {/* Modals */}
         <LeaveApplicationModal />
         <RequestDetailsModal />
       </div>

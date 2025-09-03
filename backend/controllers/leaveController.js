@@ -1,4 +1,4 @@
-// controllers/leaveController.js - Leave Management Controller (Complete Fixed Version)
+// controllers/leaveController.js
 const { query } = require('../config/database');
 const { 
   calculateTotalDays, 
@@ -7,32 +7,32 @@ const {
   checkStaffExists
 } = require('../utils/leaveUtilities');
 
-console.log('Loading leave management controller...');
-
-// Leave type mappings - matching your database
 const LEAVE_TYPE_MAPPING = {
+  // Frontend format -> Database format
   'casual_leave': 'Casual Leave',
   'sick_leave': 'Sick Leave',
   'annual_leave': 'Annual Leave',
   'maternity_leave': 'Maternity Leave',
-  'paternity_leave': 'Paternity Leave'
+  'paternity_leave': 'Paternity Leave',
+  // Also handle database format -> display format
+  'Casual Leave': 'Casual Leave',
+  'Sick Leave': 'Sick Leave',
+  'Annual Leave': 'Annual Leave',
+  'Maternity Leave': 'Maternity Leave',
+  'Paternity Leave': 'Paternity Leave'
 };
-
-// ===== Main Functions =====
 
 /**
  * HR view all leave requests
  */
 const getAllLeaveRequests = async (req, res) => {
   try {
-    console.log('Getting all leave requests...');
     const { status, leave_type, start_date, end_date, limit = 50, offset = 0 } = req.query;
     
     let whereConditions = [];
     let queryParams = [];
     let paramCount = 0;
     
-    // Build filter conditions
     if (status) {
       paramCount++;
       whereConditions.push(`lr.status = $${paramCount}`);
@@ -60,7 +60,6 @@ const getAllLeaveRequests = async (req, res) => {
     const whereClause = whereConditions.length > 0 ? 
       'WHERE ' + whereConditions.join(' AND ') : '';
     
-    // Simplified query to avoid JOIN issues
     const mainQuery = `
       SELECT 
         lr.request_id,
@@ -93,12 +92,8 @@ const getAllLeaveRequests = async (req, res) => {
     
     queryParams.push(parseInt(limit), parseInt(offset));
     
-    console.log('Executing query:', mainQuery);
-    console.log('With params:', queryParams);
-    
     const result = await query(mainQuery, queryParams);
     
-    // Get total count - simplified
     const countQuery = `
       SELECT COUNT(*) as total
       FROM leave_requests lr
@@ -109,22 +104,18 @@ const getAllLeaveRequests = async (req, res) => {
     const countResult = await query(countQuery, queryParams.slice(0, -2));
     const total = parseInt(countResult.rows[0].total);
     
-    // Format the data
     const formattedData = result.rows.map(row => ({
       ...row,
       leave_type_display: LEAVE_TYPE_MAPPING[row.leave_type] || row.leave_type,
       medical_certificate: Boolean(row.medical_certificate)
     }));
     
-    // Statistics
     const stats = {
       total: formattedData.length,
       pending: formattedData.filter(r => r.status === 'Pending').length,
       approved: formattedData.filter(r => r.status === 'Approved').length,
       rejected: formattedData.filter(r => r.status === 'Rejected').length
     };
-    
-    console.log(`Successfully retrieved ${formattedData.length} leave requests`);
     
     res.json({
       success: true,
@@ -140,7 +131,6 @@ const getAllLeaveRequests = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Failed to get leave requests:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get leave requests',
@@ -154,8 +144,6 @@ const getAllLeaveRequests = async (req, res) => {
  */
 const getPendingRequests = async (req, res) => {
   try {
-    console.log('Getting pending leave requests...');
-    
     const result = await query(`
       SELECT 
         lr.request_id,
@@ -187,7 +175,6 @@ const getPendingRequests = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Failed to get pending requests:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get pending requests',
@@ -203,8 +190,6 @@ const getMyLeaveRequests = async (req, res) => {
   try {
     const { staff_id } = req.params;
     const { status, limit = 20, offset = 0 } = req.query;
-    
-    console.log(`Getting leave requests for staff ${staff_id}`);
     
     let whereConditions = ['lr.staff_id = $1'];
     let queryParams = [parseInt(staff_id)];
@@ -256,8 +241,6 @@ const getMyLeaveRequests = async (req, res) => {
       medical_certificate: Boolean(row.medical_certificate)
     }));
     
-    console.log(`Successfully retrieved ${formattedData.length} leave records for staff ${staff_id}`);
-    
     res.json({
       success: true,
       message: `Successfully retrieved ${formattedData.length} leave records`,
@@ -266,7 +249,6 @@ const getMyLeaveRequests = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Failed to get staff leave records:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get leave records',
@@ -282,9 +264,6 @@ const submitLeaveRequest = async (req, res) => {
   try {
     const { staff_id, leave_type, start_date, end_date, reason, medical_certificate } = req.body;
     
-    console.log('Submitting leave request:', { staff_id, leave_type, start_date, end_date });
-    
-    // Basic validation
     if (!staff_id || !leave_type || !start_date || !end_date || !reason?.trim()) {
       return res.status(400).json({
         success: false,
@@ -292,7 +271,6 @@ const submitLeaveRequest = async (req, res) => {
       });
     }
     
-    // Validate staff exists
     const staffCheck = await query('SELECT staff_id, name FROM staff WHERE staff_id = $1', [parseInt(staff_id)]);
     if (staffCheck.rows.length === 0) {
       return res.status(400).json({
@@ -301,7 +279,6 @@ const submitLeaveRequest = async (req, res) => {
       });
     }
     
-    // Validate dates
     const startDate = new Date(start_date);
     const endDate = new Date(end_date);
     const today = new Date();
@@ -321,13 +298,9 @@ const submitLeaveRequest = async (req, res) => {
       });
     }
     
-    // Calculate days (simple version)
     const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-    
-    // Convert frontend leave type to database format
     const dbLeaveType = LEAVE_TYPE_MAPPING[leave_type] || leave_type;
     
-    // Create request
     const result = await query(`
       INSERT INTO leave_requests (
         staff_id, leave_type, start_date, end_date, total_days,
@@ -344,8 +317,6 @@ const submitLeaveRequest = async (req, res) => {
     newRequest.staff_name = staffCheck.rows[0].name;
     newRequest.leave_type_display = dbLeaveType;
     
-    console.log(`Staff ${staff_id} submitted a new leave request - ID: ${newRequest.request_id}`);
-    
     res.status(201).json({
       success: true,
       message: 'Leave request submitted successfully',
@@ -353,7 +324,6 @@ const submitLeaveRequest = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Failed to submit leave request:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to submit leave request',
@@ -363,14 +333,14 @@ const submitLeaveRequest = async (req, res) => {
 };
 
 /**
- * HR approve leave request
+ * HR approve leave request - 修正假期類型匹配問題
  */
 const approveLeaveRequest = async (req, res) => {
   try {
     const { request_id } = req.params;
     const { approved_by, comments } = req.body;
     
-    console.log(`Approving leave request ${request_id} by ${approved_by}`);
+    console.log('Approving request:', { request_id, approved_by, comments });
     
     if (!approved_by) {
       return res.status(400).json({
@@ -379,7 +349,6 @@ const approveLeaveRequest = async (req, res) => {
       });
     }
     
-    // Check if request exists and is pending
     const requestCheck = await query(`
       SELECT lr.*, s.name as staff_name 
       FROM leave_requests lr
@@ -395,6 +364,7 @@ const approveLeaveRequest = async (req, res) => {
     }
     
     const leaveRequest = requestCheck.rows[0];
+    console.log('Found leave request:', leaveRequest);
     
     if (leaveRequest.status !== 'Pending') {
       return res.status(400).json({
@@ -403,31 +373,120 @@ const approveLeaveRequest = async (req, res) => {
       });
     }
     
-    // Update request status
-    const result = await query(`
-      UPDATE leave_requests 
-      SET status = 'Approved', 
-          approved_by = $1, 
-          approved_on = CURRENT_TIMESTAMP,
-          rejection_reason = $2
-      WHERE request_id = $3
-      RETURNING *
-    `, [parseInt(approved_by), comments, parseInt(request_id)]);
+    // Start transaction for atomic operations
+    await query('BEGIN');
+    console.log('Transaction started');
     
-    const updatedRequest = result.rows[0];
-    updatedRequest.staff_name = leaveRequest.staff_name;
-    updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
-    
-    console.log(`Leave request ${request_id} approved successfully`);
-    
-    res.json({
-      success: true,
-      message: 'Leave request approved',
-      data: updatedRequest
-    });
+    try {
+      // Update request status
+      const result = await query(`
+        UPDATE leave_requests 
+        SET status = 'Approved', 
+            approved_by = $1, 
+            approved_on = CURRENT_TIMESTAMP
+        WHERE request_id = $2
+        RETURNING *
+      `, [parseInt(approved_by), parseInt(request_id)]);
+      
+      console.log('Leave request updated:', result.rows[0]);
+      
+      // 修正假期類型匹配邏輯
+      const leaveType = leaveRequest.leave_type;
+      const totalDays = leaveRequest.total_days;
+      const staffId = leaveRequest.staff_id;
+      
+      console.log('Updating leave balance:', { leaveType, totalDays, staffId });
+      
+      let updateQuery = '';
+      let leaveColumn = '';
+      
+      // 處理兩種格式的假期類型
+      switch (leaveType.toLowerCase()) {
+        case 'annual leave':
+        case 'annual_leave':
+          updateQuery = 'UPDATE leave SET al_used = COALESCE(al_used, 0) + $1 WHERE staff_id = $2';
+          leaveColumn = 'annual leave';
+          break;
+        case 'sick leave':
+        case 'sick_leave':
+          updateQuery = 'UPDATE leave SET sl_used = COALESCE(sl_used, 0) + $1 WHERE staff_id = $2';
+          leaveColumn = 'sick leave';
+          break;
+        case 'casual leave':
+        case 'casual_leave':
+          updateQuery = 'UPDATE leave SET cl_used = COALESCE(cl_used, 0) + $1 WHERE staff_id = $2';
+          leaveColumn = 'casual leave';
+          break;
+        case 'maternity leave':
+        case 'maternity_leave':
+          updateQuery = 'UPDATE leave SET ml_used = COALESCE(ml_used, 0) + $1 WHERE staff_id = $2';
+          leaveColumn = 'maternity leave';
+          break;
+        case 'paternity leave':
+        case 'paternity_leave':
+          updateQuery = 'UPDATE leave SET pl_used = COALESCE(pl_used, 0) + $1 WHERE staff_id = $2';
+          leaveColumn = 'paternity leave';
+          break;
+        default:
+          console.log('Unknown leave type, skipping balance update:', leaveType);
+          break;
+      }
+      
+      if (updateQuery) {
+        console.log(`Updating ${leaveColumn} balance: +${totalDays} days for staff ${staffId}`);
+        
+        // 先檢查員工是否有假期記錄
+        const leaveCheck = await query('SELECT * FROM leave WHERE staff_id = $1', [staffId]);
+        console.log('Leave record check:', leaveCheck.rows);
+        
+        if (leaveCheck.rows.length === 0) {
+          throw new Error(`Staff ${staffId} does not have a leave balance record. Please create one first.`);
+        }
+        
+        const balanceResult = await query(updateQuery, [totalDays, staffId]);
+        console.log('Balance update result:', {
+          rowCount: balanceResult.rowCount,
+          command: balanceResult.command
+        });
+        
+        // 驗證更新是否成功
+        if (balanceResult.rowCount === 0) {
+          throw new Error(`Failed to update leave balance for staff ${staffId}. No matching record found.`);
+        }
+        
+        // 驗證更新後的餘額
+        const updatedBalance = await query('SELECT * FROM leave WHERE staff_id = $1', [staffId]);
+        console.log('Updated balance:', updatedBalance.rows[0]);
+        
+      } else {
+        console.log('No balance update needed for leave type:', leaveType);
+      }
+      
+      // Commit transaction
+      await query('COMMIT');
+      console.log('Transaction committed successfully');
+      
+      const updatedRequest = result.rows[0];
+      updatedRequest.staff_name = leaveRequest.staff_name;
+      updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
+      
+      res.json({
+        success: true,
+        message: updateQuery ? 
+          `Leave request approved and ${leaveColumn} balance updated (+${totalDays} days)` : 
+          'Leave request approved (no balance update)',
+        data: updatedRequest
+      });
+      
+    } catch (transactionError) {
+      // Rollback transaction on error
+      await query('ROLLBACK');
+      console.error('Transaction rolled back due to error:', transactionError);
+      throw transactionError;
+    }
     
   } catch (error) {
-    console.error('Failed to approve leave request:', error);
+    console.error('Error in approveLeaveRequest:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to approve leave request',
@@ -444,8 +503,6 @@ const rejectLeaveRequest = async (req, res) => {
     const { request_id } = req.params;
     const { rejected_by, reason } = req.body;
     
-    console.log(`Rejecting leave request ${request_id} by ${rejected_by}`);
-    
     if (!rejected_by || !reason?.trim()) {
       return res.status(400).json({
         success: false,
@@ -453,7 +510,6 @@ const rejectLeaveRequest = async (req, res) => {
       });
     }
     
-    // Check if request exists and is pending
     const requestCheck = await query(`
       SELECT lr.*, s.name as staff_name 
       FROM leave_requests lr
@@ -477,7 +533,6 @@ const rejectLeaveRequest = async (req, res) => {
       });
     }
     
-    // Update request status
     const result = await query(`
       UPDATE leave_requests 
       SET status = 'Rejected', 
@@ -492,8 +547,6 @@ const rejectLeaveRequest = async (req, res) => {
     updatedRequest.staff_name = leaveRequest.staff_name;
     updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
     
-    console.log(`Leave request ${request_id} rejected successfully`);
-    
     res.json({
       success: true,
       message: 'Leave request rejected',
@@ -501,7 +554,6 @@ const rejectLeaveRequest = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Failed to reject leave request:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to reject leave request',
@@ -511,14 +563,12 @@ const rejectLeaveRequest = async (req, res) => {
 };
 
 /**
- * Staff cancel leave request
+ * Staff cancel leave request - 也需要處理配額還原
  */
 const cancelLeaveRequest = async (req, res) => {
   try {
     const { request_id } = req.params;
     const { staff_id, reason } = req.body;
-    
-    console.log(`Staff ${staff_id} cancelling leave request ${request_id}`);
     
     if (!staff_id) {
       return res.status(400).json({
@@ -527,7 +577,6 @@ const cancelLeaveRequest = async (req, res) => {
       });
     }
     
-    // Check if request exists and belongs to the staff
     const requestCheck = await query(`
       SELECT lr.*, s.name as staff_name 
       FROM leave_requests lr
@@ -544,36 +593,82 @@ const cancelLeaveRequest = async (req, res) => {
     
     const leaveRequest = requestCheck.rows[0];
     
-    if (leaveRequest.status !== 'Pending') {
+    if (leaveRequest.status !== 'Pending' && leaveRequest.status !== 'Approved') {
       return res.status(400).json({
         success: false,
-        message: `Can only cancel pending requests. Current status: ${leaveRequest.status}`
+        message: `Can only cancel pending or approved requests. Current status: ${leaveRequest.status}`
       });
     }
     
-    // Update request status
-    const result = await query(`
-      UPDATE leave_requests 
-      SET status = 'Cancelled',
-          rejection_reason = $1
-      WHERE request_id = $2
-      RETURNING *
-    `, [reason || 'Staff initiated cancellation', parseInt(request_id)]);
+    // Start transaction for atomic operations
+    await query('BEGIN');
     
-    const updatedRequest = result.rows[0];
-    updatedRequest.staff_name = leaveRequest.staff_name;
-    updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
-    
-    console.log(`Staff ${staff_id} cancelled leave request ${request_id} successfully`);
-    
-    res.json({
-      success: true,
-      message: 'Leave request cancelled',
-      data: updatedRequest
-    });
+    try {
+      // Update request status
+      const result = await query(`
+        UPDATE leave_requests 
+        SET status = 'Cancelled',
+            rejection_reason = $1
+        WHERE request_id = $2
+        RETURNING *
+      `, [reason || 'Staff initiated cancellation', parseInt(request_id)]);
+      
+      // If the request was previously approved, we need to restore the leave balance
+      if (leaveRequest.status === 'Approved') {
+        const leaveType = leaveRequest.leave_type;
+        const totalDays = leaveRequest.total_days;
+        const staffIdValue = leaveRequest.staff_id;
+        
+        let updateQuery = '';
+        
+        switch (leaveType) {
+          case 'Annual Leave':
+            updateQuery = 'UPDATE leave SET al_used = GREATEST(0, al_used - $1) WHERE staff_id = $2';
+            break;
+          case 'Sick Leave':
+            updateQuery = 'UPDATE leave SET sl_used = GREATEST(0, sl_used - $1) WHERE staff_id = $2';
+            break;
+          case 'Casual Leave':
+            updateQuery = 'UPDATE leave SET cl_used = GREATEST(0, cl_used - $1) WHERE staff_id = $2';
+            break;
+          case 'Maternity Leave':
+            updateQuery = 'UPDATE leave SET ml_used = GREATEST(0, ml_used - $1) WHERE staff_id = $2';
+            break;
+          case 'Paternity Leave':
+            updateQuery = 'UPDATE leave SET pl_used = GREATEST(0, pl_used - $1) WHERE staff_id = $2';
+            break;
+          default:
+            // Unknown leave type, skip balance update
+            break;
+        }
+        
+        if (updateQuery) {
+          await query(updateQuery, [totalDays, staffIdValue]);
+        }
+      }
+      
+      // Commit transaction
+      await query('COMMIT');
+      
+      const updatedRequest = result.rows[0];
+      updatedRequest.staff_name = leaveRequest.staff_name;
+      updatedRequest.leave_type_display = LEAVE_TYPE_MAPPING[updatedRequest.leave_type] || updatedRequest.leave_type;
+      
+      res.json({
+        success: true,
+        message: leaveRequest.status === 'Approved' 
+          ? 'Leave request cancelled and balance restored' 
+          : 'Leave request cancelled',
+        data: updatedRequest
+      });
+      
+    } catch (transactionError) {
+      // Rollback transaction on error
+      await query('ROLLBACK');
+      throw transactionError;
+    }
     
   } catch (error) {
-    console.error('Failed to cancel leave request:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel leave request',
@@ -583,12 +678,10 @@ const cancelLeaveRequest = async (req, res) => {
 };
 
 /**
- * Get all leave quotas - HR function
+ * Get all leave quotas
  */ 
 const getAllLeaveQuotas = async (req, res) => {
   try {
-    console.log('Getting all leave quotas...');
-    
     const result = await query(`
       SELECT 
         l.*,
@@ -598,15 +691,12 @@ const getAllLeaveQuotas = async (req, res) => {
       ORDER BY l.staff_id ASC
     `); 
     
-    console.log(`Retrieved ${result.rows.length} leave quotas`);
-    
     res.json({
       success: true,
       message: `Successfully retrieved ${result.rows.length} leave quotas`,
       data: result.rows
     });
   } catch (error) {
-    console.error('Failed to get all leave quotas:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get quotas',
@@ -621,7 +711,6 @@ const getAllLeaveQuotas = async (req, res) => {
 const getMyLeaveQuota = async (req, res) => {
   try {
     const { staff_id } = req.params;
-    console.log(`Getting leave quota for staff ${staff_id}`);
     
     const result = await query(`
       SELECT 
@@ -635,14 +724,11 @@ const getMyLeaveQuota = async (req, res) => {
     `, [parseInt(staff_id)]); 
     
     if (result.rows.length === 0) {
-      console.log(`No quota record found for staff ${staff_id}`);
       return res.status(404).json({
         success: false,
         message: 'Leave quota record not found for this staff member'
       });
     }
-    
-    console.log(`Successfully retrieved leave quota for staff ${staff_id}`);
     
     res.json({
       success: true,
@@ -651,7 +737,6 @@ const getMyLeaveQuota = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Failed to get leave quota:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get quota',
@@ -671,5 +756,3 @@ module.exports = {
   getAllLeaveQuotas,
   getMyLeaveQuota
 };
-
-console.log('Leave management controller loaded successfully!');

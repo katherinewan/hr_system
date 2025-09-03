@@ -20,7 +20,6 @@ import {
   FileHeart, 
   CircleDollarSign, 
   LogOut, 
-  Home,
   History
 } from 'lucide-react';
 // logo
@@ -60,9 +59,7 @@ export default function ButtonAppBar() {
     console.log('Navigating to:', path);
     try {
       // 使用相對路徑導航
-      if (path === '/') {
-        navigate('/staff/');
-      } else if (path.startsWith('/staff/')) {
+      if (path.startsWith('/staff/')) {
         navigate(path);
       } else if (path !== '/logout') {
         // 對於非登出的路径，自動加上 /staff 前綴
@@ -97,7 +94,6 @@ export default function ButtonAppBar() {
     navigate('/App'); // 確保 Router 中有 /login 對應到 Loginform.jsx
   };
 
-
   // 格式化時間
   const formatTime = (date) => {
     return date.toLocaleTimeString('zh-TW', {
@@ -126,8 +122,7 @@ export default function ButtonAppBar() {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <Home />, path: '/staff/' }, // 或 '/staff'
-    { text: 'Profile', icon: <Users />, path: '/staff/staff-profile'}, // 加上 /staff 前綴
+    { text: 'Profile', icon: <Users />, path: '/staff/staff-profile'}, 
     { text: 'Attendance', icon: <Calendar />, path: '/staff/staff-attendance'}, 
     { text: 'Leave Management', icon: <FileHeart />, path: '/staff/leave-management'}, 
     { text: 'Payslip', icon: <CircleDollarSign />, path: '/staff/payslip'}, 

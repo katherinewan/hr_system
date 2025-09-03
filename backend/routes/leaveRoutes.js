@@ -1,9 +1,8 @@
-// routes/leaveRoutes.js - Updated Leave Management Routes
+// routes/leaveRoutes.js
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 
-// Import controllers
 const { 
   getAllLeaveRequests,
   getPendingRequests,
@@ -16,11 +15,9 @@ const {
   getMyLeaveQuota
 } = require('../controllers/leaveController');
 
-console.log('Loading leave management routes...');
-
-// ===== Rate Limiting =====
+// Rate limiting
 const requestLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 20,
   message: {
     success: false,
@@ -28,7 +25,7 @@ const requestLimiter = rateLimit({
   }
 });
 
-// ===== Validation Middleware =====
+// Validation middleware
 const validateStaffId = (req, res, next) => {
   const { staff_id } = req.params;
   const staffIdInt = parseInt(staff_id);
@@ -59,77 +56,27 @@ const validateRequestId = (req, res, next) => {
   next();
 };
 
-// ===== Route Definitions =====
-
-// Test endpoint
+// Routes
 router.get('/test', (req, res) => {
   res.json({
     success: true,
     message: 'Leave management system is running normally',
-    timestamp: new Date().toISOString(),
-    available_endpoints: [
-      'GET /quotas - HR view all quotas',
-      'GET /quotas/:staff_id - View staff quota',
-      'GET /requests - HR view all requests',
-      'GET /requests/pending - HR view pending requests',
-      'GET /requests/staff/:staff_id - Staff view own leave records',
-      'POST /requests - Staff submit leave request',
-      'PUT /requests/:request_id/approve - HR approve request',
-      'PUT /requests/:request_id/reject - HR reject request',
-      'PUT /requests/:request_id/cancel - Staff cancel request'
-    ]
+    timestamp: new Date().toISOString()
   });
 });
 
-// HR function: View all quotas
 router.get('/quotas', getAllLeaveQuotas);
-
-// View staff quota
-router.get('/quotas/:staff_id', 
-  validateStaffId,
-  getMyLeaveQuota
-);
-
-// HR function: View all leave requests
+router.get('/quotas/:staff_id', validateStaffId, getMyLeaveQuota);
 router.get('/requests', getAllLeaveRequests);
-
-// HR function: View pending requests specifically
 router.get('/requests/pending', getPendingRequests);
+router.get('/requests/staff/:staff_id', validateStaffId, getMyLeaveRequests);
+router.post('/requests', requestLimiter, submitLeaveRequest);
+router.put('/requests/:request_id/approve', validateRequestId, approveLeaveRequest);
+router.put('/requests/:request_id/reject', validateRequestId, rejectLeaveRequest);
+router.put('/requests/:request_id/cancel', validateRequestId, cancelLeaveRequest);
 
-// Staff function: View own leave records
-router.get('/requests/staff/:staff_id', 
-  validateStaffId,
-  getMyLeaveRequests
-);
-
-// Staff function: Submit leave request
-router.post('/requests',
-  requestLimiter,
-  submitLeaveRequest
-);
-
-// HR function: Approve leave request
-router.put('/requests/:request_id/approve',
-  validateRequestId,
-  approveLeaveRequest
-);
-
-// HR function: Reject leave request
-router.put('/requests/:request_id/reject',
-  validateRequestId,
-  rejectLeaveRequest
-);
-
-// Staff function: Cancel leave request
-router.put('/requests/:request_id/cancel',
-  validateRequestId,
-  cancelLeaveRequest
-);
-
-// ===== Error Handling =====
+// Error handling
 router.use((err, req, res, next) => {
-  console.error('Leave route error:', err);
-  
   if (err.code === '23505') {
     return res.status(400).json({
       success: false,
@@ -144,23 +91,10 @@ router.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 router.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
-    available_routes: [
-      'GET /test',
-      'GET /quotas',
-      'GET /quotas/:staff_id',
-      'GET /requests',
-      'GET /requests/pending',
-      'GET /requests/staff/:staff_id',
-      'POST /requests',
-      'PUT /requests/:request_id/approve',
-      'PUT /requests/:request_id/reject',
-      'PUT /requests/:request_id/cancel'
-    ]
+    message: `Route not found: ${req.method} ${req.originalUrl}`
   });
 });
 
