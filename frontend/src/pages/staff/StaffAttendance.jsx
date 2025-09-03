@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, AlertCircle } from 'lucide-react';
+import { User, AlertCircle, Loader } from 'lucide-react';
 
 const StaffAttendance = () => {
   const [attendanceData, setAttendanceData] = useState(null);
@@ -121,15 +121,6 @@ const StaffAttendance = () => {
     );
   };
 
-  const renderLoadingState = () => (
-    <div className="staff-profile-container">
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Loading your attendance...</p>
-      </div>
-    </div>
-  );
-
   const renderErrorMessage = (message, type = 'error') => (
     <div className={`error-message ${type}`}>
       <AlertCircle size={20} />
@@ -138,7 +129,18 @@ const StaffAttendance = () => {
   );
 
   if (loading) {
-    return renderLoadingState();
+    return (
+      <div className="staff-profile-container">
+        <div className="profile-card">
+          <div className="profile-content">
+            <div className="loading-state">
+              <Loader size={48} className="animate-spin" />
+              <div>Loading your attendance records...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // If there's an error and no attendance data

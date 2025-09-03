@@ -46,13 +46,13 @@ const StaffLeave = () => {
 
   const fetchCurrentUser = async () => {
     try {
-      // Try to get from localStorage first - 配合你的登入頁面格式
+      // Try to get from localStorage first - é…åˆä½ çš„ç™»å…¥é é¢æ ¼å¼
       const storedUserInfo = localStorage.getItem('userInfo');
       const storedToken = localStorage.getItem('authToken');
       
       if (storedUserInfo) {
         const user = JSON.parse(storedUserInfo);
-        // 確保使用正確的 staff_id 格式 (應該是 1001-1020 範圍)
+        // ç¢ºä¿ä½¿ç"¨æ­£ç¢ºçš„ staff_id æ ¼å¼ (æ‡‰è©²æ˜¯ 1001-1020 ç¯„åœ)
         setCurrentUser({ staff_id: user.staff_id });
         return;
       }
@@ -579,9 +579,13 @@ const StaffLeave = () => {
   if (loading) {
     return (
       <div className="staff-profile-container">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading leave data...</p>
+        <div className="profile-card">
+          <div className="profile-content">
+            <div className="loading-state">
+              <Loader size={48} className="animate-spin" />
+              <div>Loading leave data...</div>
+            </div>
+          </div>
         </div>
       </div>
     );
