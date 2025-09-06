@@ -684,8 +684,13 @@ const getAllLeaveQuotas = async (req, res) => {
   try {
     const result = await query(`
       SELECT 
-        l.*,
-        s.name as staff_name
+        l.staff_id,
+        s.name as staff_name,
+        l.al_quota, l.al_used, (COALESCE(l.al_quota, 0) - COALESCE(l.al_used, 0)) as al_remaining,
+        l.sl_quota, l.sl_used, (COALESCE(l.sl_quota, 0) - COALESCE(l.sl_used, 0)) as sl_remaining,
+        l.cl_quota, l.cl_used, (COALESCE(l.cl_quota, 0) - COALESCE(l.cl_used, 0)) as cl_remaining,
+        l.ml_quota, l.ml_used, (COALESCE(l.ml_quota, 0) - COALESCE(l.ml_used, 0)) as ml_remaining,
+        l.pl_quota, l.pl_used, (COALESCE(l.pl_quota, 0) - COALESCE(l.pl_used, 0)) as pl_remaining
       FROM leave l
       LEFT JOIN staff s ON l.staff_id = s.staff_id
       ORDER BY l.staff_id ASC
