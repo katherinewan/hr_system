@@ -83,6 +83,8 @@ export default function ButtonAppBar() {
       localStorage.removeItem('authToken');
       localStorage.removeItem('userInfo');
       localStorage.removeItem('rememberedStaffId');
+      localStorage.removeItem('currentUser');
+      console.log('localStorage cleared successfully');
     } catch (err) {
       console.error('Error clearing localStorage:', err);
     }
@@ -90,13 +92,15 @@ export default function ButtonAppBar() {
     // 通知 App 或其他組件登出
     window.dispatchEvent(new Event('logout'));
 
-    // 導向登入頁
-    navigate('/App'); // 確保 Router 中有 /login 對應到 Loginform.jsx
+    // 使用 window.location 強制重導向到根路徑的登入頁
+    window.location.href = '/login';
+    
+    setDrawerOpen(false);
   };
 
-  // 格式化時間
+  // 格式化時間 - 英文格式
   const formatTime = (date) => {
-    return date.toLocaleTimeString('zh-TW', {
+    return date.toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -105,7 +109,7 @@ export default function ButtonAppBar() {
   };
 
   const formatDate = (date) => {
-    return date.toLocaleDateString('zh-TW', {
+    return date.toLocaleDateString('en-GB', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -113,7 +117,7 @@ export default function ButtonAppBar() {
   };
 
   const formatLastLogin = (date) => {
-    return date.toLocaleString('zh-TW', {
+    return date.toLocaleString('en-GB', {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
@@ -122,10 +126,10 @@ export default function ButtonAppBar() {
   };
 
   const menuItems = [
-    { text: 'Profile', icon: <Users />, path: '/staff/staff-profile'}, 
-    { text: 'Attendance', icon: <Calendar />, path: '/staff/staff-attendance'}, 
-    { text: 'Leave Management', icon: <FileHeart />, path: '/staff/leave-management'}, 
-    { text: 'Payslip', icon: <CircleDollarSign />, path: '/staff/payslip'}, 
+    { text: 'Profile', icon: <Users />, path: '/staff/staff-profile', category: 'main'}, 
+    { text: 'Attendance', icon: <Calendar />, path: '/staff/staff-attendance', category: 'main'}, 
+    { text: 'Leave Management', icon: <FileHeart />, path: '/staff/leave-management', category: 'main'}, 
+    { text: 'Payslip', icon: <CircleDollarSign />, path: '/staff/payslip', category: 'main'}, 
     { text: 'Sign Out', icon: <LogOut />, path: '/logout', category: 'auth', isLogout: true }
   ];
   
@@ -141,8 +145,11 @@ export default function ButtonAppBar() {
     <Box
       sx={{ 
         width: 280,
+        height: '100vh',
         background: 'linear-gradient(180deg, #254E70 0%, #799496 100%)',
-        color: 'white'
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column'
       }}
       role="presentation"
     >
@@ -150,7 +157,8 @@ export default function ButtonAppBar() {
       <Box sx={{ 
         p: 3, 
         borderBottom: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(255,255,255,0.05)'
+        background: 'rgba(255,255,255,0.05)',
+        flexShrink: 0
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box sx={{ 
@@ -181,7 +189,11 @@ export default function ButtonAppBar() {
       </Box>
 
       {/* Navigation Menu */}
-      <Box sx={{ flex: 1, overflow: 'auto', py: 1 }}>
+      <Box sx={{ 
+        flex: 1, 
+        overflow: 'auto', 
+        py: 1 
+      }}>
         {Object.entries(groupedItems).map(([category, items]) => (
           <Box key={category} sx={{ mb: 2 }}>
             <List sx={{ py: 0 }}>
@@ -318,7 +330,7 @@ export default function ButtonAppBar() {
                 <History size={14} className="history-icon" />
                 <Box className="last-login-content">
                   <Typography variant="caption" className="last-login-label">
-                    上次登入
+                    Last Login
                   </Typography>
                   <Typography variant="caption" className="last-login-time">
                     {formatLastLogin(lastLoginTime)}
@@ -337,7 +349,9 @@ export default function ButtonAppBar() {
         PaperProps={{
           sx: {
             border: 'none',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            height: '100vh',
+            minHeight: '100vh'
           }
         }}
       >

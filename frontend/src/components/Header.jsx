@@ -80,6 +80,7 @@ export default function ButtonAppBar() {
       localStorage.removeItem('authToken');
       localStorage.removeItem('userInfo');
       localStorage.removeItem('rememberedStaffId');
+      localStorage.removeItem('currentUser');
       console.log('localStorage cleared successfully');
     } catch (err) {
       console.error('Error clearing localStorage:', err);
@@ -94,10 +95,9 @@ export default function ButtonAppBar() {
     setDrawerOpen(false);
   };
 
-
   // 格式化時間
   const formatTime = (date) => {
-    return date.toLocaleTimeString('zh-TW', {
+    return date.toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -106,7 +106,7 @@ export default function ButtonAppBar() {
   };
 
   const formatDate = (date) => {
-    return date.toLocaleDateString('zh-TW', {
+    return date.toLocaleDateString('en-GB', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -114,7 +114,7 @@ export default function ButtonAppBar() {
   };
 
   const formatLastLogin = (date) => {
-    return date.toLocaleString('zh-TW', {
+    return date.toLocaleString('en-GB', {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
@@ -137,13 +137,20 @@ export default function ButtonAppBar() {
 
   const getCategoryTitle = (category) => {
     switch (category) {
-      case 'main': return 'Dashboard';
-      case 'hr': return 'Human Resources';
-      case 'payroll': return 'Payroll & Finance';
-      case 'org': return 'Organization';
-      case 'system': return 'System';
-      case 'auth': return 'Account';
-      default: return '';
+      case 'main': 
+        return 'Dashboard';
+      case 'hr': 
+        return 'Human Resources';
+      case 'payroll': 
+        return 'Payroll & Finance';
+      case 'org': 
+        return 'Organization';
+      case 'system': 
+        return 'System';
+      case 'auth': 
+        return 'Account';
+      default: 
+        return '';
     }
   };
 
@@ -159,8 +166,11 @@ export default function ButtonAppBar() {
     <Box
       sx={{ 
         width: 280,
+        height: '100vh',
         background: 'linear-gradient(180deg, #254E70 0%, #799496 100%)',
-        color: 'white'
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column'
       }}
       role="presentation"
     >
@@ -168,7 +178,8 @@ export default function ButtonAppBar() {
       <Box sx={{ 
         p: 3, 
         borderBottom: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(255,255,255,0.05)'
+        background: 'rgba(255,255,255,0.05)',
+        flexShrink: 0
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box sx={{ 
@@ -199,7 +210,11 @@ export default function ButtonAppBar() {
       </Box>
 
       {/* Navigation Menu */}
-      <Box sx={{ flex: 1, overflow: 'auto', py: 1 }}>
+      <Box sx={{ 
+        flex: 1, 
+        overflow: 'auto', 
+        py: 1 
+      }}>
         {Object.entries(groupedItems).map(([category, items]) => (
           <Box key={category} sx={{ mb: 2 }}>
             <Typography variant="overline" sx={{ 
@@ -366,7 +381,9 @@ export default function ButtonAppBar() {
         PaperProps={{
           sx: {
             border: 'none',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            height: '100vh',
+            minHeight: '100vh'
           }
         }}
       >

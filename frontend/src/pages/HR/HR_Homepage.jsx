@@ -1,4 +1,5 @@
-// HR_Homepage.jsx - Fixed Route Configuration
+import '/src/styles/HR.css';
+// HR_Homepage.jsx - Fixed User Data Issue
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { 
@@ -41,15 +42,37 @@ const DashboardHome = () => {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
+        console.log('開始獲取用戶資訊...');
+        
         // Get user info from localStorage or session storage
         const storedUser = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser');
+        console.log('storedUser:', storedUser);
         
         if (storedUser) {
           const userData = JSON.parse(storedUser);
-          setUserInfo(userData);
+          console.log('解析後的用戶資料:', userData);
+          
+          // 檢查資料結構 - 如果有 success 和 user 屬性，則取出 user
+          if (userData.success && userData.user) {
+            console.log('從 success/user 結構中提取用戶資料:', userData.user);
+            setUserInfo(userData.user);
+          } 
+          // 如果直接是用戶物件
+          else if (userData.name || userData.staff_id) {
+            console.log('直接使用用戶資料:', userData);
+            setUserInfo(userData);
+          }
+          // 其他情況，嘗試使用整個物件
+          else {
+            console.log('使用完整物件作為用戶資料:', userData);
+            setUserInfo(userData);
+          }
         } else {
+          console.log('沒有找到儲存的用戶資料，嘗試從API獲取...');
+          
           // If no stored user data, try to fetch from API using auth token
           const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+          console.log('token存在:', !!token);
           
           if (token) {
             // API call to get current user info
@@ -60,11 +83,27 @@ const DashboardHome = () => {
               }
             });
             
+            console.log('API回應狀態:', response.status);
+            
             if (response.ok) {
-              const userData = await response.json();
-              setUserInfo(userData);
-              // Store user data for future use
-              localStorage.setItem('currentUser', JSON.stringify(userData));
+              const apiData = await response.json();
+              console.log('從API獲取的資料:', apiData);
+              
+              // 處理API回應的資料結構
+              let finalUserData;
+              if (apiData.success && apiData.user) {
+                finalUserData = apiData.user;
+              } else if (apiData.data) {
+                finalUserData = apiData.data;
+              } else {
+                finalUserData = apiData;
+              }
+              
+              console.log('最終用戶資料:', finalUserData);
+              setUserInfo(finalUserData);
+              
+              // Store user data for future use (store the processed user object, not the API response)
+              localStorage.setItem('currentUser', JSON.stringify(finalUserData));
             } else {
               console.error('Failed to fetch user info:', response.statusText);
               // Redirect to login if unauthorized
@@ -80,8 +119,6 @@ const DashboardHome = () => {
         }
       } catch (error) {
         console.error('Error fetching user info:', error);
-        // Fallback: try to get user from context or props if available
-        // You might want to handle this differently based on your auth system
       }
     };
 
@@ -183,6 +220,9 @@ const DashboardHome = () => {
     navigate(path);
   };
 
+  // 除錯資訊
+  console.log('當前 userInfo 狀態:', userInfo);
+
   return (
     <div className="dashboard-container">
       {/* Hero Section */}
@@ -208,7 +248,7 @@ const DashboardHome = () => {
               margin: '0 0 1rem 0',
               opacity: 0.9
             }}>
-              {userInfo ? `Welcome back, ${userInfo.name}!` : 'Welcome to HR Management System'}
+              {userInfo?.name ? `Welcome back, ${userInfo.name}!` : 'Welcome to HR Management System'}
             </p>
             {userInfo && (
               <div style={{
@@ -216,22 +256,26 @@ const DashboardHome = () => {
                 gap: '1rem',
                 flexWrap: 'wrap'
               }}>
-                <span style={{
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '20px',
-                  fontSize: '0.9rem'
-                }}>
-                  {userInfo.role}
-                </span>
-                <span style={{
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '20px',
-                  fontSize: '0.9rem'
-                }}>
-                  ID: {userInfo.staff_id}
-                </span>
+                {userInfo.role && (
+                  <span style={{
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.9rem'
+                  }}>
+                    {userInfo.role}
+                  </span>
+                )}
+                {userInfo.staff_id && (
+                  <span style={{
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.9rem'
+                  }}>
+                    ID: {userInfo.staff_id}
+                  </span>
+                )}
                 {userInfo.department_name && (
                   <span style={{
                     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -240,6 +284,16 @@ const DashboardHome = () => {
                     fontSize: '0.9rem'
                   }}>
                     {userInfo.department_name}
+                  </span>
+                )}
+                {userInfo.email && (
+                  <span style={{
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.9rem'
+                  }}>
+                    {userInfo.email}
                   </span>
                 )}
               </div>
@@ -353,7 +407,6 @@ const DashboardHome = () => {
         padding: '2rem',
         paddingBottom: '3rem'
       }}>
-
         <div style={{
           backgroundColor: 'white',
           padding: '1rem',
